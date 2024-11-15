@@ -3,8 +3,10 @@ use aes_gcm::{Aes256Gcm, Nonce};
 use base64ct::{Base64, Encoding};
 use generic_array::GenericArray;
 use hkdf::Hkdf;
-use ml_kem::kem::{Decapsulate, Encapsulate};
-use ml_kem::*;
+use ml_kem::{
+    kem::{Decapsulate, Encapsulate},
+    *,
+};
 use rand::thread_rng;
 use sha2::Sha256;
 use std::fs::File;
