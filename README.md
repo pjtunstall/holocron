@@ -19,6 +19,7 @@ Under construction. Early days. So far, I've just set up a little demo of the pu
 - Start separating code into functions.
 - Generate two quantum key pairs, one for Alice and one for Bob.
 - Add classical p256.
+- Turn prototype with hardcoded message into unit tests, then continue writing tests as I go along.
 - Accept command-line arguments and store public and private keys in text files.
 - Use `zeroize` crate to wipe memory before dropping variables.
 - Switch to SQLite storage: one table for public keys and one for private.
