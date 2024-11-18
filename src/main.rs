@@ -1,94 +1,207 @@
+// #![allow(dead_code)]
+
+// use aes_gcm::aead::{Aead, KeyInit};
+// use aes_gcm::{Aes256Gcm, Nonce};
+// use base64ct::{Base64, Encoding};
+// use generic_array::GenericArray;
+// use hkdf::Hkdf;
+// use ml_kem::{
+//     kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
+//     KemCore, MlKem1024, MlKem1024Params,
+// };
+// // use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey};
+// use rand::{rngs::ThreadRng, thread_rng, RngCore};
+// // use rand_core::OsRng;
+// use sha2::Sha256;
+// use std::fs::File;
+// use std::io::Write;
+
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64ct::{Base64, Encoding};
 use generic_array::GenericArray;
 use hkdf::Hkdf;
+use hybrid_array;
 use ml_kem::{
-    kem::{Decapsulate, Encapsulate},
-    *,
+    kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
+    KemCore, MlKem1024, MlKem1024Params,
 };
-// use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey};
-use rand::thread_rng;
-// use rand_core::OsRng;
+use rand::{rngs::ThreadRng, thread_rng, RngCore};
 use sha2::Sha256;
-use std::fs::File;
-use std::io::Write;
 
-// TODO
-// - Start separating code into functions.
-// - Generate two quantum key pairs, one for Alice and one for Bob.
-// - Add classical p256.
-// - Accept command-line arguments and store public and private keys in text files.
+fn generate_kyber_keys(
+    r: &mut ThreadRng,
+) -> (
+    DecapsulationKey<MlKem1024Params>,
+    EncapsulationKey<MlKem1024Params>,
+) {
+    MlKem1024::generate(r)
+}
+
+fn encapsulate_kyber_key(
+    rng: &mut ThreadRng,
+    ek: &EncapsulationKey<MlKem1024Params>,
+) -> (
+    hybrid_array::Array<
+        u8,
+        typenum::uint::UInt<
+            typenum::uint::UInt<
+                typenum::uint::UInt<
+                    typenum::uint::UInt<
+                        typenum::uint::UInt<
+                            typenum::uint::UInt<
+                                typenum::uint::UInt<
+                                    typenum::uint::UInt<
+                                        typenum::uint::UInt<
+                                            typenum::uint::UInt<
+                                                typenum::uint::UInt<
+                                                    typenum::uint::UTerm,
+                                                    typenum::bit::B1,
+                                                >,
+                                                typenum::bit::B1,
+                                            >,
+                                            typenum::bit::B0,
+                                        >,
+                                        typenum::bit::B0,
+                                    >,
+                                    typenum::bit::B0,
+                                >,
+                                typenum::bit::B1,
+                            >,
+                            typenum::bit::B0,
+                        >,
+                        typenum::bit::B0,
+                    >,
+                    typenum::bit::B0,
+                >,
+                typenum::bit::B0,
+            >,
+            typenum::bit::B0,
+        >,
+    >,
+    hybrid_array::Array<
+        u8,
+        typenum::uint::UInt<
+            typenum::uint::UInt<
+                typenum::uint::UInt<
+                    typenum::uint::UInt<
+                        typenum::uint::UInt<
+                            typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>,
+                            typenum::bit::B0,
+                        >,
+                        typenum::bit::B0,
+                    >,
+                    typenum::bit::B0,
+                >,
+                typenum::bit::B0,
+            >,
+            typenum::bit::B0,
+        >,
+    >,
+) {
+    ek.encapsulate(rng).unwrap()
+}
 
 fn main() {
     let mut rng = thread_rng();
 
-    // Generate quantum (decapsulation key, encapsulation key) pair
-    let (qdk, qek) = MlKem1024::generate(&mut rng);
+    println!("Generating key pair for Bob...");
+    let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys(&mut rng);
 
-    // Generate classical (decapsulation, encapsulatio) keypair.
+    println!("Keys generated.");
+    println!("\nAlice wants to send Bob a secret message...");
 
-    // Encode quantum private key as base 64 string.
-    let qdk_string = Base64::encode_string(format!("{:?}", qdk).as_bytes());
+    // Alice uses Bob's encapsulation key (public key) to create a shared secret
+    // let (kyber_encrypted_secret, alice_shared_secret) = bob_kyber_ek.encapsulate(&mut rng).unwrap();
+    let (kyber_encrypted_secret, alice_shared_secret) =
+        encapsulate_kyber_key(&mut rng, &bob_kyber_ek);
 
-    // Save quantum private key to file.
-    let mut file = File::create("private_key.txt").unwrap();
-    writeln!(file, "{}", qdk_string).unwrap();
-    println!("Encrypted key saved.");
+    // // Add this after the encapsulation:
+    // println!(
+    //     "Type of kyber_encrypted_secret: {}",
+    //     std::any::type_name_of_val(&kyber_encrypted_secret)
+    // );
+    // println!(
+    //     "Type of alice_shared_secret: {}",
+    //     std::any::type_name_of_val(&alice_shared_secret)
+    // );
 
-    // Encapsulate a shared key to the holder of the decapsulation key
-    let (qct, k_send) = qek.encapsulate(&mut rng).unwrap();
-
-    // Direqctly serialize the ciphertext bytes
-    let qct_string = Base64::encode_string(qct.as_slice());
-    println!("Shared key size: {:?}", qct_string.len());
-
-    // Derive a 32-byte key using HKDF
-    let hk = Hkdf::<Sha256>::new(None, &k_send);
-    let mut okm = [0u8; 32];
-    hk.expand(b"aes256gcm key", &mut okm)
+    // Alice derives an encryption key from the shared secret
+    let hk = Hkdf::<Sha256>::new(None, &alice_shared_secret); // HMAC-based Key derivation
+    let mut okm = [0u8; 32]; // Output key material
+    hk.expand(b"aes256gcm key", &mut okm) // First parameter hashed to make this okm distinct from others derived from the same secret but with a different purpose, such as authentication.
         .expect("HKDF expand failed");
 
     let key = GenericArray::from_slice(&okm);
     let cipher = Aes256Gcm::new(key);
 
-    let nonce = Nonce::from_slice(b"unique nonce"); // 12 bytes; must be unique
+    // Generate a random nonce
+    let mut nonce_bytes = [0u8; 12];
+    rng.fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    // Alice's secret message to Bob
     let plaintext = b"We're in a spot of bother.";
+
+    // Alice encrypts her message
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_ref())
         .expect("encryption failure!");
 
-    let encoded_message = Base64::encode_string(ciphertext.as_ref());
-    let full_message = format!("{}:{}", qct_string, encoded_message);
-    println!("Full message: {}", full_message);
+    // Alice prepares the full message for transmission
+    let kyber_encrypted_secret_string = Base64::encode_string(kyber_encrypted_secret.as_slice());
+    let nonce_string = Base64::encode_string(&nonce_bytes);
+    let encrypted_message = Base64::encode_string(ciphertext.as_ref());
+    let full_message = format!(
+        "{}:{}:{}",
+        kyber_encrypted_secret_string, nonce_string, encrypted_message
+    );
 
-    // Simulate message transmission by splitting the received message
+    println!("\nAlice's encrypted message: {}", full_message);
+    println!("\nMessage is sent to Bob...");
+
+    // --- Message transmission happens here ---
+
+    println!("\nBob receives the message and decrypts it...");
+
+    // Bob splits up the received message components
     let parts: Vec<&str> = full_message.split(':').collect();
-    let received_qct_string = parts[0];
-    let received_ciphertext_string = parts[1];
+    let received_kyber_encrypted_secret_string = parts[0];
+    let received_nonce_string = parts[1];
+    let received_ciphertext_string = parts[2];
 
-    // Deserialize the ciphertext back into the correqct type
-    let qct_bytes = Base64::decode_vec(received_qct_string).unwrap();
+    // Bob recovers the ML-KEM ciphertext
+    let ct_bytes = Base64::decode_vec(received_kyber_encrypted_secret_string).unwrap();
+    let mut received_kyber_encrypted_secret = kyber_encrypted_secret.clone();
+    received_kyber_encrypted_secret.copy_from_slice(&ct_bytes);
 
-    // Clone the original ciphertext type using the decoded bytes
-    let mut qct_clone = qct.clone();
-    qct_clone.copy_from_slice(&qct_bytes);
+    // Bob uses his decapsulation key (private key) to recover the shared secret
+    let bob_shared_secret = bob_kyber_dk
+        .decapsulate(&received_kyber_encrypted_secret)
+        .unwrap();
 
-    // Decapsulate the shared key using the deserialized ciphertext
-    let k_recv = qdk.decapsulate(&qct_clone).unwrap();
-    let hk = Hkdf::<Sha256>::new(None, &k_recv);
-    let mut okm = [0u8; 32];
+    // Bob derives the same encryption key from the shared secret
+    let hk = Hkdf::<Sha256>::new(None, &bob_shared_secret); // HMAC-based Key derivation
+    let mut okm = [0u8; 32]; // Output key material
     hk.expand(b"aes256gcm key", &mut okm)
         .expect("HKDF expand failed");
 
     let key = GenericArray::from_slice(&okm);
     let cipher = Aes256Gcm::new(key);
 
+    // Bob recovers the nonce and ciphertext
+    let received_nonce_bytes = Base64::decode_vec(received_nonce_string).unwrap();
+    let received_nonce = Nonce::from_slice(&received_nonce_bytes);
     let received_ciphertext = Base64::decode_vec(received_ciphertext_string).unwrap();
+
+    // Bob decrypts the message
     let decrypted_data = cipher
-        .decrypt(nonce, received_ciphertext.as_ref())
+        .decrypt(received_nonce, received_ciphertext.as_ref())
         .expect("decryption failure!");
 
-    let decoded = String::from_utf8(decrypted_data).unwrap();
-    println!("Decrypted: {:?}", decoded);
+    let decoded_message = String::from_utf8(decrypted_data).unwrap();
+    println!(
+        "\nBob successfully decrypted Alice's message: {:?}",
+        decoded_message
+    );
 }

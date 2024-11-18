@@ -14,10 +14,8 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Under construction. Early days. So far, I've just set up a little demo of the purely post-quantum system ML-KEM, aka Kyber. Yet to do:
 
-- Check that the divider is not used in the base 64 encoding.
 - Check hyphenation conventions of algorithm names.
 - Start separating code into functions.
-- Generate two quantum key pairs, one for Alice and one for Bob.
 - Add classical p256.
 - Turn prototype with hardcoded message into unit tests, then continue writing tests as I go along.
 - Accept command-line arguments and store public and private keys in text files.

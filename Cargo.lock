@@ -264,6 +264,7 @@ dependencies = [
  "base64ct",
  "generic-array",
  "hkdf",
+ "hybrid-array",
  "ml-kem",
  "p256",
  "rand",
