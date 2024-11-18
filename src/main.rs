@@ -41,8 +41,9 @@ enum DecryptionError {
     Base64Error(base64ct::Error),
     InvalidFormat,
     Utf8Error(std::string::FromUtf8Error),
-    DecryptionError(String),
+    AesError(String),
     KyberError(String),
+    KeyDerivationError(String),
 }
 
 impl std::fmt::Display for DecryptionError {
@@ -51,13 +52,20 @@ impl std::fmt::Display for DecryptionError {
             DecryptionError::Base64Error(e) => write!(f, "Base64 decoding error: {}", e),
             DecryptionError::InvalidFormat => write!(f, "Invalid message format"),
             DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error: {}", e),
-            DecryptionError::DecryptionError(e) => write!(f, "Decryption error: {}", e),
+            DecryptionError::AesError(e) => write!(f, "Decryption error: {}", e),
             DecryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
+            DecryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
         }
     }
 }
 
 impl std::error::Error for DecryptionError {}
+
+impl From<EncryptionError> for DecryptionError {
+    fn from(err: EncryptionError) -> Self {
+        DecryptionError::KeyDerivationError(err.to_string())
+    }
+}
 
 impl From<base64ct::Error> for DecryptionError {
     fn from(err: base64ct::Error) -> Self {
@@ -195,11 +203,10 @@ fn decrypt(
     let message = parse_wire_message(wire_message)?;
 
     let shared_secret = decapsulate_key(kyber_dk, &message.encapsulated_secret)?;
-    let decryption_key = derive_encryption_key(&shared_secret)
-        .map_err(|e| DecryptionError::DecryptionError(e.to_string()))?;
+    let decryption_key = derive_encryption_key(&shared_secret)?;
 
     let plaintext = aes_decrypt(&decryption_key, &message.nonce, &message.ciphertext)
-        .map_err(|e| DecryptionError::DecryptionError(e.to_string()))?;
+        .map_err(|e| DecryptionError::AesError(e.to_string()))?;
 
     String::from_utf8(plaintext).map_err(DecryptionError::Utf8Error)
 }
