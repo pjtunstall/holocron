@@ -1,207 +1,223 @@
-// #![allow(dead_code)]
-
-// use aes_gcm::aead::{Aead, KeyInit};
-// use aes_gcm::{Aes256Gcm, Nonce};
-// use base64ct::{Base64, Encoding};
-// use generic_array::GenericArray;
-// use hkdf::Hkdf;
-// use ml_kem::{
-//     kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
-//     KemCore, MlKem1024, MlKem1024Params,
-// };
-// // use p256::{ecdh::EphemeralSecret, EncodedPoint, PublicKey};
-// use rand::{rngs::ThreadRng, thread_rng, RngCore};
-// // use rand_core::OsRng;
-// use sha2::Sha256;
-// use std::fs::File;
-// use std::io::Write;
-
-use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::{Aes256Gcm, Nonce};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    {Aes256Gcm, Nonce},
+};
 use base64ct::{Base64, Encoding};
 use generic_array::GenericArray;
 use hkdf::Hkdf;
-use hybrid_array;
+use hybrid_array::Array;
 use ml_kem::{
     kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
     KemCore, MlKem1024, MlKem1024Params,
 };
-use rand::{rngs::ThreadRng, thread_rng, RngCore};
+use rand::{thread_rng, RngCore};
 use sha2::Sha256;
 
-fn generate_kyber_keys(
-    r: &mut ThreadRng,
-) -> (
+// ----- Encryption side errors -----
+
+#[derive(Debug)]
+enum EncryptionError {
+    KyberError(String),
+    AesError(String),
+    KeyDerivationError(String),
+}
+
+impl std::fmt::Display for EncryptionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EncryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
+            EncryptionError::AesError(e) => write!(f, "AES encryption failed: {}", e),
+            EncryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for EncryptionError {}
+
+// ----- Decryption side errors -----
+
+#[derive(Debug)]
+enum DecryptionError {
+    Base64Error(base64ct::Error),
+    InvalidFormat,
+    Utf8Error(std::string::FromUtf8Error),
+    DecryptionError(String),
+    KyberError(String),
+}
+
+impl std::fmt::Display for DecryptionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DecryptionError::Base64Error(e) => write!(f, "Base64 decoding error: {}", e),
+            DecryptionError::InvalidFormat => write!(f, "Invalid message format"),
+            DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error: {}", e),
+            DecryptionError::DecryptionError(e) => write!(f, "Decryption error: {}", e),
+            DecryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for DecryptionError {}
+
+impl From<base64ct::Error> for DecryptionError {
+    fn from(err: base64ct::Error) -> Self {
+        DecryptionError::Base64Error(err)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for DecryptionError {
+    fn from(err: std::string::FromUtf8Error) -> Self {
+        DecryptionError::Utf8Error(err)
+    }
+}
+
+// ----- Key generation -----
+
+fn generate_kyber_keys() -> (
     DecapsulationKey<MlKem1024Params>,
     EncapsulationKey<MlKem1024Params>,
 ) {
-    MlKem1024::generate(r)
-}
-
-fn encapsulate_kyber_key(
-    rng: &mut ThreadRng,
-    ek: &EncapsulationKey<MlKem1024Params>,
-) -> (
-    hybrid_array::Array<
-        u8,
-        typenum::uint::UInt<
-            typenum::uint::UInt<
-                typenum::uint::UInt<
-                    typenum::uint::UInt<
-                        typenum::uint::UInt<
-                            typenum::uint::UInt<
-                                typenum::uint::UInt<
-                                    typenum::uint::UInt<
-                                        typenum::uint::UInt<
-                                            typenum::uint::UInt<
-                                                typenum::uint::UInt<
-                                                    typenum::uint::UTerm,
-                                                    typenum::bit::B1,
-                                                >,
-                                                typenum::bit::B1,
-                                            >,
-                                            typenum::bit::B0,
-                                        >,
-                                        typenum::bit::B0,
-                                    >,
-                                    typenum::bit::B0,
-                                >,
-                                typenum::bit::B1,
-                            >,
-                            typenum::bit::B0,
-                        >,
-                        typenum::bit::B0,
-                    >,
-                    typenum::bit::B0,
-                >,
-                typenum::bit::B0,
-            >,
-            typenum::bit::B0,
-        >,
-    >,
-    hybrid_array::Array<
-        u8,
-        typenum::uint::UInt<
-            typenum::uint::UInt<
-                typenum::uint::UInt<
-                    typenum::uint::UInt<
-                        typenum::uint::UInt<
-                            typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>,
-                            typenum::bit::B0,
-                        >,
-                        typenum::bit::B0,
-                    >,
-                    typenum::bit::B0,
-                >,
-                typenum::bit::B0,
-            >,
-            typenum::bit::B0,
-        >,
-    >,
-) {
-    ek.encapsulate(rng).unwrap()
-}
-
-fn main() {
     let mut rng = thread_rng();
+    MlKem1024::generate(&mut rng)
+}
 
-    println!("Generating key pair for Bob...");
-    let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys(&mut rng);
+// ----- Encryption functions -----
 
-    println!("Keys generated.");
-    println!("\nAlice wants to send Bob a secret message...");
+fn encapsulate_key(
+    kyber_ek: &EncapsulationKey<MlKem1024Params>,
+) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
+    let mut rng = thread_rng();
+    kyber_ek
+        .encapsulate(&mut rng)
+        .map(|(secret, shared)| (secret.to_vec(), shared.to_vec()))
+        .map_err(|e| EncryptionError::KyberError(format!("{:?}", e)))
+}
 
-    // Alice uses Bob's encapsulation key (public key) to create a shared secret
-    // let (kyber_encrypted_secret, alice_shared_secret) = bob_kyber_ek.encapsulate(&mut rng).unwrap();
-    let (kyber_encrypted_secret, alice_shared_secret) =
-        encapsulate_kyber_key(&mut rng, &bob_kyber_ek);
+fn derive_encryption_key(shared_secret: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+    let hk = Hkdf::<Sha256>::new(None, shared_secret);
+    let mut okm = [0u8; 32];
+    hk.expand(b"aes256gcm key", &mut okm)
+        .map_err(|e| EncryptionError::KeyDerivationError(e.to_string()))?;
+    Ok(okm.to_vec())
+}
 
-    // // Add this after the encapsulation:
-    // println!(
-    //     "Type of kyber_encrypted_secret: {}",
-    //     std::any::type_name_of_val(&kyber_encrypted_secret)
-    // );
-    // println!(
-    //     "Type of alice_shared_secret: {}",
-    //     std::any::type_name_of_val(&alice_shared_secret)
-    // );
-
-    // Alice derives an encryption key from the shared secret
-    let hk = Hkdf::<Sha256>::new(None, &alice_shared_secret); // HMAC-based Key derivation
-    let mut okm = [0u8; 32]; // Output key material
-    hk.expand(b"aes256gcm key", &mut okm) // First parameter hashed to make this okm distinct from others derived from the same secret but with a different purpose, such as authentication.
-        .expect("HKDF expand failed");
-
-    let key = GenericArray::from_slice(&okm);
+fn aes_encrypt(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
+    let mut rng = thread_rng();
+    let key = GenericArray::from_slice(key);
     let cipher = Aes256Gcm::new(key);
 
-    // Generate a random nonce
     let mut nonce_bytes = [0u8; 12];
     rng.fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // Alice's secret message to Bob
-    let plaintext = b"We're in a spot of bother.";
-
-    // Alice encrypts her message
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_ref())
-        .expect("encryption failure!");
+        .map_err(|e| EncryptionError::AesError(e.to_string()))?;
 
-    // Alice prepares the full message for transmission
-    let kyber_encrypted_secret_string = Base64::encode_string(kyber_encrypted_secret.as_slice());
-    let nonce_string = Base64::encode_string(&nonce_bytes);
-    let encrypted_message = Base64::encode_string(ciphertext.as_ref());
-    let full_message = format!(
+    Ok((nonce_bytes.to_vec(), ciphertext))
+}
+
+fn format_wire_message(encapsulated_secret: &[u8], nonce: &[u8], ciphertext: &[u8]) -> String {
+    let encapsulated_secret_b64 = Base64::encode_string(encapsulated_secret);
+    let nonce_b64 = Base64::encode_string(nonce);
+    let ciphertext_b64 = Base64::encode_string(ciphertext);
+
+    format!(
         "{}:{}:{}",
-        kyber_encrypted_secret_string, nonce_string, encrypted_message
-    );
+        encapsulated_secret_b64, nonce_b64, ciphertext_b64
+    )
+}
 
-    println!("\nAlice's encrypted message: {}", full_message);
-    println!("\nMessage is sent to Bob...");
+fn encrypt(
+    plaintext: &[u8],
+    kyber_ek: &EncapsulationKey<MlKem1024Params>,
+) -> Result<String, EncryptionError> {
+    let (encapsulated_secret, shared_secret) = encapsulate_key(kyber_ek)?;
+    let encryption_key = derive_encryption_key(&shared_secret)?;
+    let (nonce, ciphertext) = aes_encrypt(&encryption_key, plaintext)?;
+    Ok(format_wire_message(
+        &encapsulated_secret,
+        &nonce,
+        &ciphertext,
+    ))
+}
 
-    // --- Message transmission happens here ---
+// ----- Decryption functions -----
 
-    println!("\nBob receives the message and decrypts it...");
+struct WireMessage {
+    encapsulated_secret: Vec<u8>,
+    nonce: Vec<u8>,
+    ciphertext: Vec<u8>,
+}
 
-    // Bob splits up the received message components
-    let parts: Vec<&str> = full_message.split(':').collect();
-    let received_kyber_encrypted_secret_string = parts[0];
-    let received_nonce_string = parts[1];
-    let received_ciphertext_string = parts[2];
+fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError> {
+    let parts: Vec<&str> = wire_message.split(':').collect();
+    if parts.len() != 3 {
+        return Err(DecryptionError::InvalidFormat);
+    }
 
-    // Bob recovers the ML-KEM ciphertext
-    let ct_bytes = Base64::decode_vec(received_kyber_encrypted_secret_string).unwrap();
-    let mut received_kyber_encrypted_secret = kyber_encrypted_secret.clone();
-    received_kyber_encrypted_secret.copy_from_slice(&ct_bytes);
+    Ok(WireMessage {
+        encapsulated_secret: Base64::decode_vec(parts[0])?,
+        nonce: Base64::decode_vec(parts[1])?,
+        ciphertext: Base64::decode_vec(parts[2])?,
+    })
+}
 
-    // Bob uses his decapsulation key (private key) to recover the shared secret
-    let bob_shared_secret = bob_kyber_dk
-        .decapsulate(&received_kyber_encrypted_secret)
-        .unwrap();
+fn prepare_kyber_secret(bytes: &[u8]) -> Array<u8, <MlKem1024 as ml_kem::KemCore>::CiphertextSize> {
+    let mut array = Array::default();
+    array.copy_from_slice(bytes);
+    array
+}
 
-    // Bob derives the same encryption key from the shared secret
-    let hk = Hkdf::<Sha256>::new(None, &bob_shared_secret); // HMAC-based Key derivation
-    let mut okm = [0u8; 32]; // Output key material
-    hk.expand(b"aes256gcm key", &mut okm)
-        .expect("HKDF expand failed");
+fn decapsulate_key(
+    kyber_dk: &DecapsulationKey<MlKem1024Params>,
+    encapsulated_secret: &[u8],
+) -> Result<Vec<u8>, DecryptionError> {
+    let kyber_secret = prepare_kyber_secret(encapsulated_secret);
+    kyber_dk
+        .decapsulate(&kyber_secret)
+        .map(|secret| secret.to_vec())
+        .map_err(|e| DecryptionError::KyberError(format!("{:?}", e)))
+}
 
-    let key = GenericArray::from_slice(&okm);
+fn aes_decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, aes_gcm::Error> {
+    let key = GenericArray::from_slice(key);
     let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(nonce);
 
-    // Bob recovers the nonce and ciphertext
-    let received_nonce_bytes = Base64::decode_vec(received_nonce_string).unwrap();
-    let received_nonce = Nonce::from_slice(&received_nonce_bytes);
-    let received_ciphertext = Base64::decode_vec(received_ciphertext_string).unwrap();
+    cipher.decrypt(nonce, ciphertext.as_ref())
+}
 
-    // Bob decrypts the message
-    let decrypted_data = cipher
-        .decrypt(received_nonce, received_ciphertext.as_ref())
-        .expect("decryption failure!");
+fn decrypt(
+    wire_message: &str,
+    kyber_dk: &DecapsulationKey<MlKem1024Params>,
+) -> Result<String, DecryptionError> {
+    let message = parse_wire_message(wire_message)?;
 
-    let decoded_message = String::from_utf8(decrypted_data).unwrap();
-    println!(
-        "\nBob successfully decrypted Alice's message: {:?}",
-        decoded_message
-    );
+    let shared_secret = decapsulate_key(kyber_dk, &message.encapsulated_secret)?;
+    let decryption_key = derive_encryption_key(&shared_secret)
+        .map_err(|e| DecryptionError::DecryptionError(e.to_string()))?;
+
+    let plaintext = aes_decrypt(&decryption_key, &message.nonce, &message.ciphertext)
+        .map_err(|e| DecryptionError::DecryptionError(e.to_string()))?;
+
+    String::from_utf8(plaintext).map_err(DecryptionError::Utf8Error)
+}
+
+fn main() {
+    let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
+
+    // Alice encrypts a message for Bob
+    match encrypt(b"We're in a spot of bother.", &bob_kyber_ek) {
+        Ok(wire_message) => {
+            println!("Alice sends: {}", wire_message);
+
+            // Bob decrypts the message
+            match decrypt(&wire_message, &bob_kyber_dk) {
+                Ok(plaintext) => println!("Bob reads: {}", plaintext),
+                Err(e) => println!("Decryption failed: {}", e),
+            }
+        }
+        Err(e) => println!("Encryption failed: {}", e),
+    }
 }
