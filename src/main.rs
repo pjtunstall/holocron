@@ -212,19 +212,25 @@ fn decrypt(
 }
 
 fn main() {
+    // Alice's message.
+    let alice_plaintext = "We're in a spot of bother.";
+
+    // Generate Kyber keys for Bob.
     let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
 
-    // Alice encrypts a message for Bob
-    match encrypt(b"We're in a spot of bother.", &bob_kyber_ek) {
+    // Alice encrypts her message for Bob.
+    match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek) {
         Ok(wire_message) => {
-            println!("Alice sends: {}", wire_message);
-
-            // Bob decrypts the message
+            // Bob decrypts the message.
             match decrypt(&wire_message, &bob_kyber_dk) {
-                Ok(plaintext) => println!("Bob reads: {}", plaintext),
-                Err(e) => println!("Decryption failed: {}", e),
+                Ok(bob_plaintext) => assert_eq!(
+                    alice_plaintext, &bob_plaintext,
+                    "Message mismatch. Alice: `{}`, Bob: `{}`.",
+                    alice_plaintext, bob_plaintext
+                ),
+                Err(e) => panic!("{}", e),
             }
         }
-        Err(e) => println!("Encryption failed: {}", e),
+        Err(e) => panic!("{}", e),
     }
 }

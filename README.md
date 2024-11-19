@@ -14,9 +14,9 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Under construction. Early days. So far, I've just set up a little demo of the purely post-quantum system ML-KEM, aka Kyber. Yet to do:
 
+- Turn prototype with hardcoded message into unit tests, adding tests for success and failure, then continue writing tests as I go along.
 - Check hyphenation conventions of algorithm names.
 - Add classical p256.
-- Turn prototype with hardcoded message into unit tests, then continue writing tests as I go along.
 - Accept command-line arguments and store public and private keys in text files.
 - Use `zeroize` crate to wipe memory before dropping variables.
 - Switch to SQLite storage: one table for public keys and one for private.
