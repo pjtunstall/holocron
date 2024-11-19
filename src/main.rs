@@ -126,14 +126,12 @@ fn aes_encrypt(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Encry
 }
 
 fn format_wire_message(encapsulated_secret: &[u8], nonce: &[u8], ciphertext: &[u8]) -> String {
-    let encapsulated_secret_b64 = Base64::encode_string(encapsulated_secret);
-    let nonce_b64 = Base64::encode_string(nonce);
-    let ciphertext_b64 = Base64::encode_string(ciphertext);
+    let mut combined = Vec::new();
+    combined.extend_from_slice(encapsulated_secret);
+    combined.extend_from_slice(nonce);
+    combined.extend_from_slice(ciphertext);
 
-    format!(
-        "{}:{}:{}",
-        encapsulated_secret_b64, nonce_b64, ciphertext_b64
-    )
+    Base64::encode_string(&combined)
 }
 
 fn encrypt(
@@ -159,15 +157,23 @@ struct WireMessage {
 }
 
 fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError> {
-    let parts: Vec<&str> = wire_message.split(':').collect();
-    if parts.len() != 3 {
+    let kyber_key_length: usize = 1568;
+    let aes_nonce_length: usize = 12;
+    let kyber_key_plus_nonce_length: usize = kyber_key_length + aes_nonce_length;
+
+    let bytes = Base64::decode_vec(wire_message)?;
+    if bytes.len() < 1568 + 12 {
         return Err(DecryptionError::InvalidFormat);
     }
 
+    let encapsulated_secret = bytes[0..kyber_key_length].to_vec();
+    let nonce = bytes[kyber_key_length..kyber_key_plus_nonce_length].to_vec();
+    let ciphertext = bytes[kyber_key_plus_nonce_length..].to_vec();
+
     Ok(WireMessage {
-        encapsulated_secret: Base64::decode_vec(parts[0])?,
-        nonce: Base64::decode_vec(parts[1])?,
-        ciphertext: Base64::decode_vec(parts[2])?,
+        encapsulated_secret,
+        nonce,
+        ciphertext,
     })
 }
 
@@ -221,11 +227,12 @@ fn main() {
     // Alice encrypts her message for Bob.
     match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek) {
         Ok(wire_message) => {
+            println!("{}", wire_message);
             // Bob decrypts the message.
             match decrypt(&wire_message, &bob_kyber_dk) {
                 Ok(bob_plaintext) => assert_eq!(
                     alice_plaintext, &bob_plaintext,
-                    "Message mismatch. Alice: `{}`, Bob: `{}`.",
+                    "Message mismatch.\nAlice: `{}`\nBob: `{}`",
                     alice_plaintext, bob_plaintext
                 ),
                 Err(e) => panic!("{}", e),
