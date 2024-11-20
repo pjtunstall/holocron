@@ -299,18 +299,14 @@ fn decrypt(
 }
 
 fn main() {
-    // Alice's message.
     let alice_plaintext = "We're in a spot of bother.";
 
-    // Generate keys for Bob.
     let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
     let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
 
-    // Alice encrypts her message for Bob.
     match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
         Ok(wire_message) => {
             println!("{}", wire_message);
-            // Bob decrypts the message.
             match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
                 Ok(bob_plaintext) => {
                     assert_eq!(
