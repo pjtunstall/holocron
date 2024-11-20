@@ -18,7 +18,7 @@ Under construction. Early days. So far, I've just set up a little demo of the pu
 - Check hyphenation conventions of algorithm names.
 - Add classical p256.
 - Accept command-line arguments and store public and private keys in text files.
-- Use `zeroize` crate to wipe memory before dropping variables.
+- Use `zeroize` crate to wipe memory before dropping variables. Actually, this is already being used by RustCrypto.
 - Switch to SQLite storage: one table for public keys and one for private.
 - Allow keys to be imported and deleted.
 - Switch to accept stdin inputs.

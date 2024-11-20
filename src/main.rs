@@ -10,7 +10,8 @@ use ml_kem::{
     kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
     KemCore, MlKem1024, MlKem1024Params,
 };
-use rand::{thread_rng, RngCore};
+use rand_core::{OsRng, RngCore};
+use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use sha2::Sha256;
 
 // ----- Encryption side errors -----
@@ -20,6 +21,7 @@ enum EncryptionError {
     KyberError(String),
     AesError(String),
     KeyDerivationError(String),
+    RsaError(String),
 }
 
 impl std::fmt::Display for EncryptionError {
@@ -28,6 +30,7 @@ impl std::fmt::Display for EncryptionError {
             EncryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
             EncryptionError::AesError(e) => write!(f, "AES encryption failed: {}", e),
             EncryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
+            EncryptionError::RsaError(e) => write!(f, "RSA operation failed: {}", e),
         }
     }
 }
@@ -43,6 +46,7 @@ enum DecryptionError {
     Utf8Error(std::string::FromUtf8Error),
     AesError(String),
     KyberError(String),
+    RsaError(String),
     KeyDerivationError(String),
 }
 
@@ -54,6 +58,7 @@ impl std::fmt::Display for DecryptionError {
             DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error: {}", e),
             DecryptionError::AesError(e) => write!(f, "Decryption error: {}", e),
             DecryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
+            DecryptionError::RsaError(e) => write!(f, "rsa operation failed: {}", e),
             DecryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
         }
     }
@@ -79,29 +84,50 @@ impl From<std::string::FromUtf8Error> for DecryptionError {
     }
 }
 
+impl From<&'static str> for DecryptionError {
+    fn from(error: &'static str) -> Self {
+        DecryptionError::RsaError(error.to_string())
+    }
+}
+
 // ----- Key generation -----
 
 fn generate_kyber_keys() -> (
     DecapsulationKey<MlKem1024Params>,
     EncapsulationKey<MlKem1024Params>,
 ) {
-    let mut rng = thread_rng();
-    MlKem1024::generate(&mut rng)
+    MlKem1024::generate(&mut OsRng)
+}
+
+fn generate_rsa_keys() -> (RsaPrivateKey, RsaPublicKey) {
+    let bits = 2048;
+    let secret_key = RsaPrivateKey::new(&mut OsRng, bits).expect("failed to generate a key");
+    let public_key = RsaPublicKey::from(&secret_key);
+    (secret_key, public_key)
 }
 
 // ----- Encryption functions -----
 
-fn encapsulate_key(
+fn kyber_encapsulate_key(
     kyber_ek: &EncapsulationKey<MlKem1024Params>,
 ) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
-    let mut rng = thread_rng();
     kyber_ek
-        .encapsulate(&mut rng)
+        .encapsulate(&mut OsRng)
         .map(|(secret, shared)| (secret.to_vec(), shared.to_vec()))
         .map_err(|e| EncryptionError::KyberError(format!("{:?}", e)))
 }
 
-fn derive_encryption_key(shared_secret: &[u8]) -> Result<Vec<u8>, EncryptionError> {
+fn rsa_encapsulate_key(rsa_ek: &RsaPublicKey) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
+    let mut aes_key: [u8; 32] = [0u8; 32];
+    let mut rng = OsRng;
+    rng.fill_bytes(&mut aes_key);
+    let encrypted_aes_key = rsa_ek
+        .encrypt(&mut rng, Pkcs1v15Encrypt, &aes_key)
+        .map_err(|e| EncryptionError::RsaError(e.to_string()))?;
+    Ok((encrypted_aes_key, aes_key.to_vec()))
+}
+
+fn derive_aes_key(shared_secret: &[u8]) -> Result<Vec<u8>, EncryptionError> {
     let hk = Hkdf::<Sha256>::new(None, shared_secret);
     let mut okm = [0u8; 32];
     hk.expand(b"aes256gcm key", &mut okm)
@@ -110,7 +136,7 @@ fn derive_encryption_key(shared_secret: &[u8]) -> Result<Vec<u8>, EncryptionErro
 }
 
 fn aes_encrypt(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
-    let mut rng = thread_rng();
+    let mut rng = OsRng;
     let key = GenericArray::from_slice(key);
     let cipher = Aes256Gcm::new(key);
 
@@ -125,25 +151,40 @@ fn aes_encrypt(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Encry
     Ok((nonce_bytes.to_vec(), ciphertext))
 }
 
-fn format_wire_message(encapsulated_secret: &[u8], nonce: &[u8], ciphertext: &[u8]) -> String {
+fn format_wire_message(
+    kyber_encapsulated_secret: &[u8],
+    kyber_nonce: &[u8],
+    rsa_encapsulated_secret: &[u8],
+    rsa_nonce: &[u8],
+    ciphertext: &[u8],
+) -> String {
     let mut combined = Vec::new();
-    combined.extend_from_slice(encapsulated_secret);
-    combined.extend_from_slice(nonce);
+    combined.extend_from_slice(kyber_encapsulated_secret);
+    combined.extend_from_slice(kyber_nonce);
+    combined.extend_from_slice(rsa_encapsulated_secret);
+    combined.extend_from_slice(rsa_nonce);
     combined.extend_from_slice(ciphertext);
-
     Base64::encode_string(&combined)
 }
 
 fn encrypt(
     plaintext: &[u8],
     kyber_ek: &EncapsulationKey<MlKem1024Params>,
+    rsa_ek: &RsaPublicKey,
 ) -> Result<String, EncryptionError> {
-    let (encapsulated_secret, shared_secret) = encapsulate_key(kyber_ek)?;
-    let encryption_key = derive_encryption_key(&shared_secret)?;
-    let (nonce, ciphertext) = aes_encrypt(&encryption_key, plaintext)?;
+    let (kyber_encapsulated_secret, kyber_shared_secret) = kyber_encapsulate_key(kyber_ek)?;
+    let kyber_aes_encryption_key = derive_aes_key(&kyber_shared_secret)?;
+    let (kyber_nonce, kyber_ciphertext) = aes_encrypt(&kyber_aes_encryption_key, plaintext)?;
+
+    let (rsa_encapsulated_secret, rsa_shared_secret) = rsa_encapsulate_key(rsa_ek)?;
+    let rsa_aes_encryption_key = derive_aes_key(&rsa_shared_secret)?;
+    let (rsa_nonce, ciphertext) = aes_encrypt(&rsa_aes_encryption_key, &kyber_ciphertext)?;
+
     Ok(format_wire_message(
-        &encapsulated_secret,
-        &nonce,
+        &kyber_encapsulated_secret,
+        &kyber_nonce,
+        &rsa_encapsulated_secret,
+        &rsa_nonce,
         &ciphertext,
     ))
 }
@@ -151,28 +192,42 @@ fn encrypt(
 // ----- Decryption functions -----
 
 struct WireMessage {
-    encapsulated_secret: Vec<u8>,
-    nonce: Vec<u8>,
+    kyber_encapsulated_secret: Vec<u8>,
+    kyber_nonce: Vec<u8>,
+    rsa_encapsulated_secret: Vec<u8>,
+    rsa_nonce: Vec<u8>,
     ciphertext: Vec<u8>,
 }
 
 fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError> {
     let kyber_key_length: usize = 1568;
     let aes_nonce_length: usize = 12;
+    let rsa_key_length: usize = 256;
+
     let kyber_key_plus_nonce_length: usize = kyber_key_length + aes_nonce_length;
+    let rsa_key_plus_nonce_length: usize = rsa_key_length + aes_nonce_length;
 
     let bytes = Base64::decode_vec(wire_message)?;
-    if bytes.len() < 1568 + 12 {
+    if bytes.len() < 1568 + 24 + 256 {
         return Err(DecryptionError::InvalidFormat);
     }
 
-    let encapsulated_secret = bytes[0..kyber_key_length].to_vec();
-    let nonce = bytes[kyber_key_length..kyber_key_plus_nonce_length].to_vec();
-    let ciphertext = bytes[kyber_key_plus_nonce_length..].to_vec();
+    let kyber_encapsulated_secret = bytes[0..kyber_key_length].to_vec();
+    let kyber_nonce = bytes[kyber_key_length..kyber_key_plus_nonce_length].to_vec();
+
+    let rsa_encapsulated_secret =
+        bytes[kyber_key_plus_nonce_length..kyber_key_plus_nonce_length + rsa_key_length].to_vec();
+    let rsa_nonce = bytes[kyber_key_plus_nonce_length + rsa_key_length
+        ..kyber_key_plus_nonce_length + rsa_key_plus_nonce_length]
+        .to_vec();
+    let ciphertext =
+        bytes[kyber_key_plus_nonce_length + rsa_key_length + aes_nonce_length..].to_vec();
 
     Ok(WireMessage {
-        encapsulated_secret,
-        nonce,
+        kyber_encapsulated_secret,
+        kyber_nonce,
+        rsa_encapsulated_secret,
+        rsa_nonce,
         ciphertext,
     })
 }
@@ -183,7 +238,7 @@ fn prepare_kyber_secret(bytes: &[u8]) -> Array<u8, <MlKem1024 as ml_kem::KemCore
     array
 }
 
-fn decapsulate_key(
+fn kyber_decapsulate_key(
     kyber_dk: &DecapsulationKey<MlKem1024Params>,
     encapsulated_secret: &[u8],
 ) -> Result<Vec<u8>, DecryptionError> {
@@ -192,6 +247,16 @@ fn decapsulate_key(
         .decapsulate(&kyber_secret)
         .map(|secret| secret.to_vec())
         .map_err(|e| DecryptionError::KyberError(format!("{:?}", e)))
+}
+
+fn rsa_decapsulate_key(
+    rsa_dk: &RsaPrivateKey,
+    encapsulated_secret: &[u8],
+) -> Result<Vec<u8>, DecryptionError> {
+    let decrypted_aes_key = rsa_dk
+        .decrypt(Pkcs1v15Encrypt, &encapsulated_secret)
+        .map_err(|e| DecryptionError::RsaError(e.to_string()))?;
+    Ok(decrypted_aes_key)
 }
 
 fn aes_decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, aes_gcm::Error> {
@@ -205,14 +270,30 @@ fn aes_decrypt(key: &[u8], nonce: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, a
 fn decrypt(
     wire_message: &str,
     kyber_dk: &DecapsulationKey<MlKem1024Params>,
+    rsa_dk: &RsaPrivateKey,
 ) -> Result<String, DecryptionError> {
     let message = parse_wire_message(wire_message)?;
 
-    let shared_secret = decapsulate_key(kyber_dk, &message.encapsulated_secret)?;
-    let decryption_key = derive_encryption_key(&shared_secret)?;
+    let rsa_shared_secret: Vec<u8> = rsa_decapsulate_key(rsa_dk, &message.rsa_encapsulated_secret)
+        .map_err(|e| DecryptionError::RsaError(e.to_string()))?;
+    let rsa_aes_decryption_key = derive_aes_key(&rsa_shared_secret)?;
 
-    let plaintext = aes_decrypt(&decryption_key, &message.nonce, &message.ciphertext)
-        .map_err(|e| DecryptionError::AesError(e.to_string()))?;
+    let rsa_plaintext = aes_decrypt(
+        &rsa_aes_decryption_key,
+        &message.rsa_nonce,
+        &message.ciphertext,
+    )
+    .map_err(|e| DecryptionError::AesError(e.to_string()))?;
+
+    let kyber_shared_secret = kyber_decapsulate_key(kyber_dk, &message.kyber_encapsulated_secret)?;
+    let kyber_aes_decryption_key = derive_aes_key(&kyber_shared_secret)?;
+
+    let plaintext = aes_decrypt(
+        &kyber_aes_decryption_key,
+        &message.kyber_nonce,
+        &rsa_plaintext,
+    )
+    .map_err(|e| DecryptionError::AesError(e.to_string()))?;
 
     String::from_utf8(plaintext).map_err(DecryptionError::Utf8Error)
 }
@@ -221,20 +302,24 @@ fn main() {
     // Alice's message.
     let alice_plaintext = "We're in a spot of bother.";
 
-    // Generate Kyber keys for Bob.
+    // Generate keys for Bob.
     let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
+    let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
 
     // Alice encrypts her message for Bob.
-    match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek) {
+    match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
         Ok(wire_message) => {
             println!("{}", wire_message);
             // Bob decrypts the message.
-            match decrypt(&wire_message, &bob_kyber_dk) {
-                Ok(bob_plaintext) => assert_eq!(
-                    alice_plaintext, &bob_plaintext,
-                    "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                    alice_plaintext, bob_plaintext
-                ),
+            match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
+                Ok(bob_plaintext) => {
+                    assert_eq!(
+                        alice_plaintext, &bob_plaintext,
+                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
+                        alice_plaintext, bob_plaintext
+                    );
+                    println!("{}", bob_plaintext)
+                }
                 Err(e) => panic!("{}", e),
             }
         }

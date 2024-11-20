@@ -10,8 +10,8 @@ generic-array = "0.14.7"
 hkdf = "0.12.4"
 hybrid-array = "0.2.1"
 ml-kem = "0.2.1"
-p256 = {version  = "0.13.2", features = ["ecdh"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 rand_core = "0.6.4"
+rsa = "0.9.6"
 sha2 = "0.10.8"
 typenum = "1.17.0"
