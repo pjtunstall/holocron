@@ -62,6 +62,6 @@ Possible further developments include:
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
 - Encrypt database.
-- Add signature option and verification.
+- Add option to sign and verify messages.
 - Rustle up some proper UI to replace the terminal interface.
 - Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
