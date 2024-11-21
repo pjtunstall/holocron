@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     {Aes256Gcm, Nonce},
@@ -8,11 +10,16 @@ use hkdf::Hkdf;
 use hybrid_array::Array;
 use ml_kem::{
     kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey},
-    KemCore, MlKem1024, MlKem1024Params,
+    Encoded, EncodedSizeUser, KemCore, MlKem1024, MlKem1024Params,
 };
 use rand_core::{OsRng, RngCore};
-use rsa::{Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{
+    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
+    Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
+};
 use sha2::Sha256;
+use std::fs::File;
+use std::io::{Read, Write};
 
 // ----- Encryption side errors -----
 
@@ -100,8 +107,7 @@ fn generate_kyber_keys() -> (
 }
 
 fn generate_rsa_keys() -> (RsaPrivateKey, RsaPublicKey) {
-    let bits = 2048;
-    let secret_key = RsaPrivateKey::new(&mut OsRng, bits).expect("failed to generate a key");
+    let secret_key = RsaPrivateKey::new(&mut OsRng, 2048).expect("failed to generate a key");
     let public_key = RsaPublicKey::from(&secret_key);
     (secret_key, public_key)
 }
@@ -298,27 +304,131 @@ fn decrypt(
     String::from_utf8(plaintext).map_err(DecryptionError::Utf8Error)
 }
 
-fn main() {
-    let alice_plaintext = "We're in a spot of bother.";
+fn generate_keys(
+    username: &str,
+) -> Result<
+    (
+        EncapsulationKey<MlKem1024Params>,
+        DecapsulationKey<MlKem1024Params>,
+        RsaPublicKey,
+        RsaPrivateKey,
+    ),
+    std::io::Error,
+> {
+    let (kyber_dk, kyber_ek) = generate_kyber_keys();
+    let (rsa_dk, rsa_ek) = generate_rsa_keys();
 
-    let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
-    let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
+    let kyber_dk_bytes: &[u8] = &kyber_dk.as_bytes().to_vec();
+    let kyber_ek_bytes: &[u8] = &kyber_ek.as_bytes().to_vec();
 
-    match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
-        Ok(wire_message) => {
-            println!("{}", wire_message);
-            match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
+    let binding = rsa_dk.to_pkcs8_der().unwrap();
+    let rsa_dk_bytes = binding.as_bytes();
+    let binding = rsa_ek.to_public_key_der().unwrap();
+    let rsa_ek_bytes = binding.as_bytes();
+
+    assert_eq!(kyber_dk_bytes.len(), 3168, "kyber_dk length != 3168");
+    assert_eq!(kyber_ek_bytes.len(), 1568, "kyber_ek length != 1568");
+
+    let mut secret_key = Vec::new();
+    secret_key.extend_from_slice(kyber_dk_bytes);
+    secret_key.extend_from_slice(rsa_dk_bytes);
+
+    let mut public_key = Vec::new();
+    public_key.extend_from_slice(kyber_ek_bytes);
+    public_key.extend_from_slice(rsa_ek_bytes);
+
+    let mut s = String::new();
+    s.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
+    s.push_str(&Base64::encode_string(&secret_key));
+    s.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
+    let mut file = File::create(format!("{}_secret_key.asc", username))?;
+    file.write_all(s.as_bytes())?;
+
+    s.clear();
+    s.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
+    s.push_str(&Base64::encode_string(&public_key));
+    s.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
+    file = File::create(format!("{}_public_key.asc", username))?;
+    file.write_all(s.as_bytes())?;
+
+    Ok((kyber_ek, kyber_dk, rsa_ek, rsa_dk))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let alice_plaintext = "We're in a spot of bother.";
+
+        let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
+        let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
+
+        match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
+            Ok(wire_message) => match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
                 Ok(bob_plaintext) => {
                     assert_eq!(
                         alice_plaintext, &bob_plaintext,
                         "Message mismatch.\nAlice: `{}`\nBob: `{}`",
                         alice_plaintext, bob_plaintext
                     );
-                    println!("{}", bob_plaintext)
                 }
                 Err(e) => panic!("{}", e),
-            }
+            },
+            Err(e) => panic!("{}", e),
         }
+    }
+}
+
+fn main() {
+    let username = "bob";
+    let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = generate_keys(username).unwrap();
+    let public_key_path = format!("{}_public_key.asc", username);
+    let (loaded_kyber_ek, loaded_rsa_ek) = parse_public_key(&public_key_path).unwrap();
+    assert_eq!(kyber_ek, loaded_kyber_ek, "Public key mismatch: Kyber");
+    assert_eq!(rsa_ek, loaded_rsa_ek, "Public key mismatch: RSA");
+
+    let alice_plaintext = "We're in a spot of bother.";
+
+    match encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
+        Ok(wire_message) => match decrypt(&wire_message, &kyber_dk, &rsa_dk) {
+            Ok(bob_plaintext) => {
+                assert_eq!(
+                    alice_plaintext, &bob_plaintext,
+                    "Message mismatch.\nAlice: `{}`\nBob: `{}`",
+                    alice_plaintext, bob_plaintext
+                );
+            }
+            Err(e) => panic!("{}", e),
+        },
         Err(e) => panic!("{}", e),
     }
+}
+
+fn parse_public_key(
+    path: &str,
+) -> Result<(EncapsulationKey<MlKem1024Params>, RsaPublicKey), std::io::Error> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    let trimmed = contents
+        .strip_prefix("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n")
+        .unwrap()
+        .strip_suffix("\n\n-----END HOLOCRON PUBLIC KEY-----")
+        .unwrap();
+
+    let bytes = Base64::decode_vec(&trimmed).unwrap();
+    let kyber_bytes = bytes[..1568].to_vec();
+    let rsa_bytes = bytes[1568..].to_vec();
+
+    let kyber_array: [u8; 1568] = kyber_bytes[..].try_into().expect("Wrong length");
+    let encoded = Encoded::<EncapsulationKey<MlKem1024Params>>::from(kyber_array);
+    let kyber_ek = EncapsulationKey::<MlKem1024Params>::from_bytes(&encoded);
+
+    let rsa_ek =
+        RsaPublicKey::from_public_key_der(&rsa_bytes).expect("Failed to decode RSA public key");
+
+    Ok((kyber_ek, rsa_ek))
 }

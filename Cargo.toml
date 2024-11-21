@@ -12,7 +12,7 @@ base64ct = { version = "1.6.0", features = ["alloc"] }
 generic-array = "0.14.7"
 hkdf = "0.12.4"
 hybrid-array = "0.2.1"
-ml-kem = "0.2.1"
+ml-kem = { version = "0.2.1", features = ["zeroize"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 rand_core = "0.6.4"
 rsa = "0.9.6"
