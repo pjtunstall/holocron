@@ -535,6 +535,37 @@ fn main() {
             let username = &args[2];
             generate_keys(username).expect("Failed to generate keys");
         }
+        "-d" => {
+            if args.len() < 4 {
+                println!(
+                    "This command requires four arguments, including the program name.\n{}",
+                    &usage
+                );
+                return;
+            }
+            let ciphertext_file = &args[2];
+            let username = &args[3];
+
+            let file_path = std::env::current_dir()
+                .unwrap()
+                .join("keys")
+                .join(format!("{}_secret_key.asc", username));
+
+            if !file_path.exists() {
+                println!("Secret key file not found at: {}", file_path.display());
+                return;
+            }
+
+            let ciphertext =
+                read_to_string(ciphertext_file).expect("Failed to read ciphertext file");
+
+            let (kyber_dk, rsa_dk) =
+                parse_secret_key(&file_path.to_string_lossy()).expect("Failed to parse secret key");
+
+            let decrypted = decrypt(&ciphertext, &kyber_dk, &rsa_dk).expect("Failed to decrypt");
+
+            println!("{}", decrypted);
+        }
         "-e" => {
             if args.len() < 4 {
                 println!(
@@ -611,12 +642,13 @@ fn main() {
                 "-----END HOLOCRON MESSAGE-----".to_string()
             );
 
-            let mut file = File::create(ciphertext_file).expect("Failed to create ciphertext file");
+            let mut file =
+                File::create(&ciphertext_file).expect("Failed to create ciphertext file");
             use std::io::Write;
             file.write_all(ciphertext.as_bytes())
                 .expect("Failed to write ciphertext");
 
-            println!("Ciphertext saved to `ciphertext.asc`.");
+            println!("Ciphertext saved to `{}`.", ciphertext_file);
         }
         "-df" => {
             if args.len() < 4 {

@@ -4,11 +4,13 @@
 
 A program to encrypt and decrypt messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. In this way, in principle, messages should be at least as secure as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer.
 
-WARNING: This is not a secure cryptosystem. I'm not an expert in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues.
-
-## What's it for, then?
+## What's it for?
 
 Fun. An exercise to help me learn Rust.
+
+## Should I trust my life to it?
+
+No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues.
 
 ## Usage
 
@@ -29,16 +31,6 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 `./holocron -c` to clear all keys, i.e. delete the `keys` folder in the current directory.
 
 Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g alice`.
-
-## What state is it in?
-
-I've just set up a demo with a hardcoded message. Yet to do:
-
-- Add header and footer to wire message.
-- Create key Error types and have the newly written functions return them.
-- Add tests for success and failure of each operation.
-- Parse private key.
-- Accept command-line arguments.
 
 ## In detail
 
@@ -63,7 +55,8 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Possible further developments include:
 
-- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys.
+- Add more tests.
+- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
 - Switch to SQLite storage: one table for public keys and one for private.
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
@@ -71,3 +64,4 @@ Possible further developments include:
 - Add option to sign and verify messages.
 - Rustle up some proper UI to replace the terminal interface.
 - Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
+- Build a messaging syste on top of it.
