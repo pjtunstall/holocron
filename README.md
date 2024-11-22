@@ -16,13 +16,19 @@ Make sure you have [Rust](https://www.rust-lang.org/tools/install) installed.
 
 Clone this repository with `git clone https://github.com/pjtunstall/holocron`. Then navigate into the project directory with `cd holocron`, and run `cargo build --release` to compile. Navigate into the directory containing the compiled binary with `cd target/release` and run the program with `./holocron` as follows:
 
-`./holocron -g alice` to generate keys for Alice and save them as `alice_sec.asc` and `alice_pub.asc`.
+`./holocron -g alice` to generate keys for Alice and save them as `alice_secret.asc` and `alice_public.asc` in the `keys` folder, creating the `keys` folder if it doesn't already exist.
 
-`./holocron -e "We're in a spot of bother." bob` to encrypt a message for Bob and print the resulting wire message.
+`./holocron -e "We're in a spot of bother." bob` to encrypt a message for Bob and print the resulting ciphertext.
 
-`./holocron -ef plaintext bob` to encrypt the message in `plaintext.txt` or `ciphertext.asc` with the public key `bob_pub.asc`.
+`./holocron -d <ciphertext> bob` to decrypt the message with the secret key `bob_secret.asc` and print the resulting plaintext.
 
-`./holocron -df ciphertext bob` to decrypt the message in `ciphertext.asc` with the secret key `bob_sec.asc`.
+`./holocron -ef plaintext.txt bob` to encrypt the message in `plaintext.txt` with the public key `bob_public.asc` and save it to `ciphertext.asc`.
+
+`./holocron -df ciphertext.asc bob` to decrypt the message in `ciphertext.asc` with the secret key `bob_secret.asc` and save it to `plaintext.txt`.
+
+`./holocron -c` to clear all keys, i.e. delete the `keys` folder in the current directory.
+
+Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g alice`.
 
 ## What state is it in?
 

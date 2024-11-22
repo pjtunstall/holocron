@@ -14,12 +14,16 @@ use ml_kem::{
 };
 use rand_core::{OsRng, RngCore};
 use rsa::{
-    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
+    pkcs8::{DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
-use std::fs::File;
+use std::env;
+use std::fs;
+use std::fs::{create_dir, read_to_string, File};
+use std::io;
 use std::io::{Read, Write};
+use std::path::Path;
 
 // ----- Encryption side errors -----
 
@@ -318,6 +322,22 @@ fn generate_keys(
     let (kyber_dk, kyber_ek) = generate_kyber_keys();
     let (rsa_dk, rsa_ek) = generate_rsa_keys();
 
+    save_keys(username, &kyber_dk, &kyber_ek, &rsa_dk, &rsa_ek)?;
+
+    Ok((kyber_ek, kyber_dk, rsa_ek, rsa_dk))
+}
+
+fn save_keys(
+    username: &str,
+    kyber_dk: &DecapsulationKey<MlKem1024Params>,
+    kyber_ek: &EncapsulationKey<MlKem1024Params>,
+    rsa_dk: &RsaPrivateKey,
+    rsa_ek: &RsaPublicKey,
+) -> io::Result<()> {
+    if !Path::new("keys").is_dir() {
+        create_dir("keys")?;
+    }
+
     let kyber_dk_bytes: &[u8] = &kyber_dk.as_bytes().to_vec();
     let kyber_ek_bytes: &[u8] = &kyber_ek.as_bytes().to_vec();
 
@@ -341,75 +361,23 @@ fn generate_keys(
     s.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
     s.push_str(&Base64::encode_string(&secret_key));
     s.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
-    let mut file = File::create(format!("{}_secret_key.asc", username))?;
+    let mut file = File::create(format!("keys/{}_secret_key.asc", username))?;
     file.write_all(s.as_bytes())?;
 
     s.clear();
     s.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
     s.push_str(&Base64::encode_string(&public_key));
     s.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
-    file = File::create(format!("{}_public_key.asc", username))?;
+    file = File::create(format!("keys/{}_public_key.asc", username))?;
     file.write_all(s.as_bytes())?;
 
-    Ok((kyber_ek, kyber_dk, rsa_ek, rsa_dk))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let alice_plaintext = "We're in a spot of bother.";
-
-        let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
-        let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
-
-        match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
-            Ok(wire_message) => match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
-                Ok(bob_plaintext) => {
-                    assert_eq!(
-                        alice_plaintext, &bob_plaintext,
-                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                        alice_plaintext, bob_plaintext
-                    );
-                }
-                Err(e) => panic!("{}", e),
-            },
-            Err(e) => panic!("{}", e),
-        }
-    }
-}
-
-fn main() {
-    let username = "bob";
-    let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = generate_keys(username).unwrap();
-    let public_key_path = format!("{}_public_key.asc", username);
-    let (loaded_kyber_ek, loaded_rsa_ek) = parse_public_key(&public_key_path).unwrap();
-    assert_eq!(kyber_ek, loaded_kyber_ek, "Public key mismatch: Kyber");
-    assert_eq!(rsa_ek, loaded_rsa_ek, "Public key mismatch: RSA");
-
-    let alice_plaintext = "We're in a spot of bother.";
-
-    match encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
-        Ok(wire_message) => match decrypt(&wire_message, &kyber_dk, &rsa_dk) {
-            Ok(bob_plaintext) => {
-                assert_eq!(
-                    alice_plaintext, &bob_plaintext,
-                    "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                    alice_plaintext, bob_plaintext
-                );
-            }
-            Err(e) => panic!("{}", e),
-        },
-        Err(e) => panic!("{}", e),
-    }
+    Ok(())
 }
 
 fn parse_public_key(
     path: &str,
 ) -> Result<(EncapsulationKey<MlKem1024Params>, RsaPublicKey), std::io::Error> {
-    let mut file = File::open(path)?;
+    let mut file = File::open(&path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
 
@@ -431,4 +399,204 @@ fn parse_public_key(
         RsaPublicKey::from_public_key_der(&rsa_bytes).expect("Failed to decode RSA public key");
 
     Ok((kyber_ek, rsa_ek))
+}
+
+fn confirm_deletion() -> bool {
+    let current_dir = env::current_dir().unwrap();
+    let dir_name = current_dir.file_name().unwrap_or_default();
+
+    let mut input = String::new();
+    print!(
+        "Are you sure you want to delete all keys in {}? (Y/N): ",
+        dir_name.to_str().unwrap_or("unknown")
+    );
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut input).unwrap();
+
+    match input.trim().to_lowercase().as_str() {
+        "y" | "yes" => true,
+        _ => false,
+    }
+}
+
+fn delete_keys_folder() -> Result<(), std::io::Error> {
+    let current_dir = env::current_dir()?;
+    println!("Current working directory: {}", current_dir.display());
+
+    let folder_path = current_dir.join("keys");
+    println!("Checking path: {}", folder_path.display());
+
+    if folder_path.exists() {
+        fs::remove_dir_all(&folder_path)?;
+        println!("Keys folder deleted successfully.");
+    } else {
+        println!("Keys folder does not exist at: {}", folder_path.display());
+    }
+    Ok(())
+}
+
+fn main() {
+    let usage = "\nUsage:
+
+    \x1b[1m./holocron -g alice\x1b[0m
+    ... to generate keys for Alice and save them as `alice_secret.asc` and `alice_public.asc` in the folder `keys`, creating the folder `keys` if it doesn't exist.
+
+    \x1b[1m./holocron -e \"We're in a spot of bother.\" bob\x1b[0m
+    ... to encrypt a message for Bob with the publi key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext.
+
+    \x1b[1m./holocron -ef plaintext.txt bob\x1b[0m
+    ... to encrypt the message in `plaintext.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save it to `ciphertext.asc`.
+
+    \x1b[1m./holocron -df ciphertext bob\x1b[0m
+    ... to decrypt the message in `ciphertext.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save it to `plaintext.txt`.
+
+    \x1b[1m./holocron -c\x1b[0m to clear all keys, i.e. delete the `keys` folder in the current directory.
+    
+    Note that if you compile in debug mode and run at the same time with `cargo run`, you'll need to prefix any arguments with `--`, thus: \x1b[1m./holocron -- -g alice\x1b[0m.\n";
+
+    if env::args().len() < 2 {
+        println!("\nInsufficient arguments.\n{}", usage);
+        return;
+    }
+
+    let args: Vec<String> = env::args().collect();
+    match args[1].as_str() {
+        "-g" => {
+            let username = &args[2];
+            generate_keys(username).expect("Failed to generate keys");
+        }
+        "-c" => {
+            if confirm_deletion() {
+                delete_keys_folder().expect("Failed to delete keys folder");
+            } else {
+                println!("Exiting without deleting keys.");
+            }
+        }
+        "-e" => {
+            if args.len() < 3 {
+                println!("This command requires three arguments.\n{}", &usage);
+                return;
+            }
+            let plaintext = &args[2];
+            let username = &args[3];
+
+            let file_path = std::env::current_dir()
+                .unwrap()
+                .join("keys")
+                .join(format!("{}_public_key.asc", username));
+            let (kyber_ek, rsa_ek) = parse_public_key(&file_path.to_string_lossy()).unwrap();
+
+            let encrypted =
+                &encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek).expect("Failed to encrypt");
+
+            let ciphertext = format!(
+                "{}\n\n{}\n\n{}",
+                "------BEGIN HOLOCRON MESSAGE-----".to_string(),
+                encrypted,
+                "------END HOLOCRON MESSAGE-----".to_string()
+            );
+
+            println!("{}", ciphertext);
+        }
+        "-ef" => {
+            if args.len() < 3 {
+                println!("This command requires three arguments.\n{}", &usage);
+                return;
+            }
+            let plaintext_file = &args[2];
+            let username = &args[3];
+
+            let file_path = std::env::current_dir()
+                .unwrap()
+                .join("keys")
+                .join(format!("{}_public_key.asc", username));
+
+            if !file_path.exists() {
+                println!("Public key file not found at: {}", file_path.display());
+                return;
+            }
+
+            let plaintext = read_to_string(plaintext_file).expect("Failed to read plaintext file");
+
+            let file_path = std::env::current_dir()
+                .unwrap()
+                .join("keys")
+                .join(format!("{}_public_key.asc", username));
+
+            let (kyber_ek, rsa_ek) =
+                parse_public_key(&file_path.to_string_lossy()).expect("Failed to parse public key");
+
+            let encrypted =
+                encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek).expect("Failed to encrypt");
+
+            let ciphertext_file = "ciphertext.asc";
+            let ciphertext = format!(
+                "{}\n\n{}\n\n{}",
+                "------BEGIN HOLOCRON MESSAGE-----".to_string(),
+                encrypted,
+                "------END HOLOCRON MESSAGE-----".to_string()
+            );
+
+            let mut file = File::create(ciphertext_file).expect("Failed to create ciphertext file");
+            use std::io::Write;
+            file.write_all(ciphertext.as_bytes())
+                .expect("Failed to write ciphertext");
+
+            println!("Ciphertext saved to `ciphertext.asc`.");
+        }
+        _ => panic!("Command not found.\n{}", usage),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_keys_without_saving_then_encrypts_and_decrypt() {
+        let alice_plaintext = "We're in a spot of bother.";
+
+        let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
+        let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
+
+        match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
+            Ok(wire_message) => match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
+                Ok(bob_plaintext) => {
+                    assert_eq!(
+                        alice_plaintext, &bob_plaintext,
+                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
+                        alice_plaintext, bob_plaintext
+                    );
+                }
+                Err(e) => panic!("{}", e),
+            },
+            Err(e) => panic!("{}", e),
+        }
+    }
+
+    #[test]
+    fn generate_keys_and_save_then_encrypt_and_decrypt() {
+        let username = "bob";
+        let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = generate_keys(username).unwrap();
+        let public_key_path = format!("keys/{}_public_key.asc", username);
+        let (loaded_kyber_ek, loaded_rsa_ek) = parse_public_key(&public_key_path).unwrap();
+        assert_eq!(kyber_ek, loaded_kyber_ek, "Public key mismatch: Kyber");
+        assert_eq!(rsa_ek, loaded_rsa_ek, "Public key mismatch: RSA");
+
+        let alice_plaintext = "We're in a spot of bother.";
+
+        match encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
+            Ok(wire_message) => match decrypt(&wire_message, &kyber_dk, &rsa_dk) {
+                Ok(bob_plaintext) => {
+                    assert_eq!(
+                        alice_plaintext, &bob_plaintext,
+                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
+                        alice_plaintext, bob_plaintext
+                    );
+                }
+                Err(e) => panic!("{}", e),
+            },
+            Err(e) => panic!("{}", e),
+        }
+    }
 }

@@ -1,1 +1,4 @@
 /target
+**/keys/
+plaintext.txt
+ciphertext.asc
