@@ -461,16 +461,16 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     match args[1].as_str() {
-        "-g" => {
-            let username = &args[2];
-            generate_keys(username).expect("Failed to generate keys");
-        }
         "-c" => {
             if confirm_deletion() {
                 delete_keys_folder().expect("Failed to delete keys folder");
             } else {
                 println!("Exiting without deleting keys.");
             }
+        }
+        "-g" => {
+            let username = &args[2];
+            generate_keys(username).expect("Failed to generate keys");
         }
         "-e" => {
             if args.len() < 3 {
