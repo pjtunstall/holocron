@@ -20,11 +20,11 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 
 `./holocron -e "We're in a spot of bother." bob` to encrypt a message for Bob and print the resulting ciphertext.
 
-`./holocron -d <ciphertext> bob` to decrypt the message with the secret key `bob_secret.asc` and print the resulting plaintext.
+`./holocron -d hello.asc bob` to decrypt the message from the file `hello.asc` with the secret key `bob_secret.asc` and print the resulting plaintext.
 
-`./holocron -ef plaintext.txt bob` to encrypt the message in `plaintext.txt` with the public key `bob_public.asc` and save it to `ciphertext.asc`.
+`./holocron -ef hello.txt bob` to encrypt the message in `plaintext.txt` with the public key `bob_public.asc` and save it to `hello.asc`.
 
-`./holocron -df ciphertext.asc bob` to decrypt the message in `ciphertext.asc` with the secret key `bob_secret.asc` and save it to `plaintext.txt`.
+`./holocron -df hello.asc bob` to decrypt the message in `hello.asc` with the secret key `bob_secret.asc` and save it to `hello.txt`.
 
 `./holocron -c` to clear all keys, i.e. delete the `keys` folder in the current directory.
 

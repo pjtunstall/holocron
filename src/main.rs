@@ -14,7 +14,7 @@ use ml_kem::{
 };
 use rand_core::{OsRng, RngCore};
 use rsa::{
-    pkcs8::{DecodePublicKey, EncodePrivateKey, EncodePublicKey},
+    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
@@ -217,7 +217,17 @@ fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError
     let kyber_key_plus_nonce_length: usize = kyber_key_length + aes_nonce_length;
     let rsa_key_plus_nonce_length: usize = rsa_key_length + aes_nonce_length;
 
-    let bytes = Base64::decode_vec(wire_message)?;
+    let content = if wire_message.contains("-----BEGIN HOLOCRON MESSAGE-----") {
+        wire_message
+            .lines()
+            .filter(|line| !line.starts_with("-----") && !line.is_empty())
+            .collect::<Vec<&str>>()
+            .join("")
+    } else {
+        wire_message.to_string()
+    };
+
+    let bytes = Base64::decode_vec(&content)?;
     if bytes.len() < 1568 + 24 + 256 {
         return Err(DecryptionError::InvalidFormat);
     }
@@ -401,6 +411,52 @@ fn parse_public_key(
     Ok((kyber_ek, rsa_ek))
 }
 
+fn parse_secret_key(
+    path: &str,
+) -> Result<(DecapsulationKey<MlKem1024Params>, RsaPrivateKey), std::io::Error> {
+    let mut file = File::open(&path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    // Get content between headers, more flexibly
+    let content = contents
+        .lines()
+        .filter(|line| !line.starts_with("-----") && !line.is_empty())
+        .collect::<Vec<&str>>()
+        .join("");
+
+    let bytes = Base64::decode_vec(&content).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Failed to decode base64 content",
+        )
+    })?;
+
+    // Make sure we have enough bytes
+    if bytes.len() < 3168 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "File too short",
+        ));
+    }
+
+    let kyber_bytes = &bytes[..3168];
+    let rsa_bytes = &bytes[3168..];
+
+    let kyber_array: [u8; 3168] = kyber_bytes.try_into().map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid Kyber key length")
+    })?;
+
+    let decoded = Encoded::<DecapsulationKey<MlKem1024Params>>::from(kyber_array);
+    let kyber_dk = DecapsulationKey::<MlKem1024Params>::from_bytes(&decoded);
+
+    let rsa_dk = RsaPrivateKey::from_pkcs8_der(rsa_bytes).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to decode RSA key")
+    })?;
+
+    Ok((kyber_dk, rsa_dk))
+}
+
 fn confirm_deletion() -> bool {
     let current_dir = env::current_dir().unwrap();
     let dir_name = current_dir.file_name().unwrap_or_default();
@@ -444,11 +500,11 @@ fn main() {
     \x1b[1m./holocron -e \"We're in a spot of bother.\" bob\x1b[0m
     ... to encrypt a message for Bob with the publi key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext.
 
-    \x1b[1m./holocron -ef plaintext.txt bob\x1b[0m
-    ... to encrypt the message in `plaintext.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save it to `ciphertext.asc`.
+    \x1b[1m./holocron -ef hello.txt bob\x1b[0m
+    ... to encrypt the message in `hello.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save it to `hello.asc`.
 
     \x1b[1m./holocron -df ciphertext bob\x1b[0m
-    ... to decrypt the message in `ciphertext.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save it to `plaintext.txt`.
+    ... to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save it to `hello.txt`.
 
     \x1b[1m./holocron -c\x1b[0m to clear all keys, i.e. delete the `keys` folder in the current directory.
     
@@ -469,12 +525,22 @@ fn main() {
             }
         }
         "-g" => {
+            if args.len() < 3 {
+                println!(
+                    "This command requires three arguments, including the program name.\n{}",
+                    &usage
+                );
+                return;
+            }
             let username = &args[2];
             generate_keys(username).expect("Failed to generate keys");
         }
         "-e" => {
-            if args.len() < 3 {
-                println!("This command requires three arguments.\n{}", &usage);
+            if args.len() < 4 {
+                println!(
+                    "This command requires four arguments, including the program name.\n{}",
+                    &usage
+                );
                 return;
             }
             let plaintext = &args[2];
@@ -491,16 +557,19 @@ fn main() {
 
             let ciphertext = format!(
                 "{}\n\n{}\n\n{}",
-                "------BEGIN HOLOCRON MESSAGE-----".to_string(),
+                "-----BEGIN HOLOCRON MESSAGE-----".to_string(),
                 encrypted,
-                "------END HOLOCRON MESSAGE-----".to_string()
+                "-----END HOLOCRON MESSAGE-----".to_string()
             );
 
             println!("{}", ciphertext);
         }
         "-ef" => {
-            if args.len() < 3 {
-                println!("This command requires three arguments.\n{}", &usage);
+            if args.len() < 4 {
+                println!(
+                    "This command requires four arguments, including the program name.\n{}",
+                    &usage
+                );
                 return;
             }
             let plaintext_file = &args[2];
@@ -529,12 +598,17 @@ fn main() {
             let encrypted =
                 encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek).expect("Failed to encrypt");
 
-            let ciphertext_file = "ciphertext.asc";
+            let file_name = plaintext_file
+                .strip_suffix(".txt")
+                .unwrap_or(plaintext_file)
+                .to_string();
+
+            let ciphertext_file = format!("{}.asc", file_name);
             let ciphertext = format!(
                 "{}\n\n{}\n\n{}",
-                "------BEGIN HOLOCRON MESSAGE-----".to_string(),
+                "-----BEGIN HOLOCRON MESSAGE-----".to_string(),
                 encrypted,
-                "------END HOLOCRON MESSAGE-----".to_string()
+                "-----END HOLOCRON MESSAGE-----".to_string()
             );
 
             let mut file = File::create(ciphertext_file).expect("Failed to create ciphertext file");
@@ -543,6 +617,44 @@ fn main() {
                 .expect("Failed to write ciphertext");
 
             println!("Ciphertext saved to `ciphertext.asc`.");
+        }
+        "-df" => {
+            if args.len() < 4 {
+                println!(
+                    "This command requires four arguments, including the program name.\n{}",
+                    &usage
+                );
+                return;
+            }
+            let ciphertext_file = &args[2];
+            let username = &args[3];
+
+            let file_path = std::env::current_dir()
+                .unwrap()
+                .join("keys")
+                .join(format!("{}_secret_key.asc", username));
+
+            if !file_path.exists() {
+                println!("Secret key file not found at: {}", file_path.display());
+                return;
+            }
+
+            let ciphertext =
+                read_to_string(ciphertext_file).expect("Failed to read ciphertext file");
+
+            let (kyber_dk, rsa_dk) =
+                parse_secret_key(&file_path.to_string_lossy()).expect("Failed to parse secret key");
+
+            let decrypted = decrypt(&ciphertext, &kyber_dk, &rsa_dk).expect("Failed to decrypt");
+
+            let decrypted_file = format!("{}.txt", ciphertext_file.strip_suffix(".asc").unwrap());
+
+            let mut file = File::create(&decrypted_file).expect("Failed to create plaintext file");
+            use std::io::Write;
+            file.write_all(decrypted.as_bytes())
+                .expect("Failed to write plaintext");
+
+            println!("Plaintext saved to `{}`.", decrypted_file);
         }
         _ => panic!("Command not found.\n{}", usage),
     }
