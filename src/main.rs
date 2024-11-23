@@ -402,38 +402,66 @@ fn save_keys(
         create_dir("keys")?;
     }
 
-    let kyber_dk_bytes: &[u8] = &kyber_dk.as_bytes().to_vec();
-    let kyber_ek_bytes: &[u8] = &kyber_ek.as_bytes().to_vec();
+    let kyber_dk_bytes = kyber_dk.as_bytes().to_vec();
+    let kyber_ek_bytes = kyber_ek.as_bytes().to_vec();
 
-    let binding = rsa_dk.to_pkcs8_der().unwrap();
-    let rsa_dk_bytes = binding.as_bytes();
-    let binding = rsa_ek.to_public_key_der().unwrap();
-    let rsa_ek_bytes = binding.as_bytes();
+    let rsa_dk_bytes = rsa_dk
+        .to_pkcs8_der()
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to serialize RSA private key: {}", e),
+            )
+        })?
+        .as_bytes()
+        .to_vec();
+    let rsa_ek_bytes = rsa_ek
+        .to_public_key_der()
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to serialize RSA public key: {}", e),
+            )
+        })?
+        .as_bytes()
+        .to_vec();
 
-    assert_eq!(kyber_dk_bytes.len(), 3168, "kyber_dk length != 3168");
-    assert_eq!(kyber_ek_bytes.len(), 1568, "kyber_ek length != 1568");
+    if kyber_dk_bytes.len() != 3168 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "kyber_dk length != 3168",
+        ));
+    }
+    if kyber_ek_bytes.len() != 1568 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "kyber_ek length != 1568",
+        ));
+    }
 
     let mut secret_key = Vec::new();
-    secret_key.extend_from_slice(kyber_dk_bytes);
-    secret_key.extend_from_slice(rsa_dk_bytes);
+    secret_key.extend_from_slice(&kyber_dk_bytes);
+    secret_key.extend_from_slice(&rsa_dk_bytes);
 
     let mut public_key = Vec::new();
-    public_key.extend_from_slice(kyber_ek_bytes);
-    public_key.extend_from_slice(rsa_ek_bytes);
+    public_key.extend_from_slice(&kyber_ek_bytes);
+    public_key.extend_from_slice(&rsa_ek_bytes);
 
-    let mut s = String::new();
-    s.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
-    s.push_str(&Base64::encode_string(&secret_key));
-    s.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
+    let mut secret_key_str = String::new();
+    secret_key_str.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
+    secret_key_str.push_str(&Base64::encode_string(&secret_key));
+    secret_key_str.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
+
     let mut file = File::create(format!("keys/{}_secret_key.asc", username))?;
-    file.write_all(s.as_bytes())?;
+    file.write_all(secret_key_str.as_bytes())?;
 
-    s.clear();
-    s.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
-    s.push_str(&Base64::encode_string(&public_key));
-    s.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
-    file = File::create(format!("keys/{}_public_key.asc", username))?;
-    file.write_all(s.as_bytes())?;
+    let mut public_key_str = String::new();
+    public_key_str.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
+    public_key_str.push_str(&Base64::encode_string(&public_key));
+    public_key_str.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
+
+    let mut file = File::create(format!("keys/{}_public_key.asc", username))?;
+    file.write_all(public_key_str.as_bytes())?;
 
     Ok(())
 }
