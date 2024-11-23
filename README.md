@@ -57,23 +57,34 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 ## Further
 
-Possible further developments include:
+Definitely to do:
 
 - Add more tests: of success and failure responses to each operation.
 - Modularize.
 
-- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
+Possible further developments include:
+
+Basic features:
+
+- Add option to sign and verify messages.
+
+Better key handling:
 
 - Switch to SQLite storage: one table for public keys and one for private.
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
 - Encrypt database.
 
-- Add option to sign and verify messages.
+Better security:
+
+- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
+- Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
+- Switch to more reliable dependencies for the core algorithms.
+
+UI:
 
 - Rustle up some proper UI to replace the terminal interface.
 
-- Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
-- Switch to more reliable dependencies for the core algorithms.
+Messaging:
 
 - Build a messaging syste on top of it.
