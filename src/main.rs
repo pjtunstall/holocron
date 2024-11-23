@@ -552,8 +552,6 @@ fn parse_secret_key(
 }
 
 fn confirm_deletion() -> bool {
-    use std::{env, io};
-
     let current_dir = match env::current_dir() {
         Ok(dir) => dir,
         Err(_) => {
