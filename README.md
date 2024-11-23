@@ -18,19 +18,23 @@ Make sure you have [Rust](https://www.rust-lang.org/tools/install) installed.
 
 Clone this repository with `git clone https://github.com/pjtunstall/holocron`. Then navigate into the project directory with `cd holocron`, and run `cargo build --release` to compile. Navigate into the directory containing the compiled binary with `cd target/release` and run the program with `./holocron` as follows:
 
-`./holocron -g alice` to generate keys for Alice and save them as `alice_secret.asc` and `alice_public.asc` in the `keys` folder, creating the `keys` folder if it doesn't already exist.
+`./holocron -g bob` to generate keys for Bob and save them as `bob_secret.asc` and `bob_public.asc` in the `keys` folder, creating the `keys` folder if it doesn't already exist.
 
-`./holocron -e "We're in a spot of bother." bob` to encrypt a message for Bob and print the resulting ciphertext.
+`./holocron -g bob` to generate keys for Bob and save them as `bob_secret.asc` and `bob_public.asc` in the folder `keys`, creating the folder `keys` if it doesn't exist.
 
-`./holocron -d hello.asc bob` to decrypt the message from the file `hello.asc` with the secret key `bob_secret.asc` and print the resulting plaintext.
+`./holocron -eff hello.txt bob` to encrypt the message in `hello.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `hello.asc`.
 
-`./holocron -ef hello.txt bob` to encrypt the message in `plaintext.txt` with the public key `bob_public.asc` and save it to `hello.asc`.
+`./holocron -etf \"We're in a spot of bother.\" bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `ciphertext.asc`.
 
-`./holocron -df hello.asc bob` to decrypt the message in `hello.asc` with the secret key `bob_secret.asc` and save it to `hello.txt`.
+`./holocron -ett \"We're in a spot of bother.\" bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext to the terminal.
+
+`./holocron -dff hello.asc bob` to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save the resulting plaintext to `hello.txt`.
+
+`./holocron -dft hello.asc bob` to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and print the resulting plaintext to the terminal.
 
 `./holocron -c` to clear all keys, i.e. delete the `keys` folder in the current directory.
 
-Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g alice`.
+Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g bob`.
 
 ## In detail
 
@@ -55,13 +59,21 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Possible further developments include:
 
-- Add more tests.
+- Add more tests: of success and failure responses to each operation.
+- Modularize.
+
 - Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
+
 - Switch to SQLite storage: one table for public keys and one for private.
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
 - Encrypt database.
+
 - Add option to sign and verify messages.
+
 - Rustle up some proper UI to replace the terminal interface.
+
 - Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
+- Switch to more reliable dependencies for the core algorithms.
+
 - Build a messaging syste on top of it.

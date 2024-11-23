@@ -18,12 +18,56 @@ use rsa::{
     Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
-use std::env;
-use std::fs;
-use std::fs::{create_dir, read_to_string, File};
-use std::io;
-use std::io::{Read, Write};
-use std::path::Path;
+use std::{
+    env,
+    error::Error,
+    fs::{self, create_dir, File},
+    io::{self, Read, Write},
+    path::Path,
+};
+
+fn main() {
+    let usage = "\nUsage:
+
+    \x1b[1m./holocron -g bob\x1b[0m
+    ... to generate keys for Bob and save them as `bob_secret.asc` and `bob_public.asc` in the folder `keys`, creating the folder `keys` if it doesn't exist.
+
+    \x1b[1m./holocron -eff hello.txt bob\x1b[0m
+    ... to encrypt the message in `hello.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `hello.asc`.
+
+    \x1b[1m./holocron -etf \"We're in a spot of bother.\" bob\x1b[0m
+    ... to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `ciphertext.asc`.
+
+    \x1b[1m./holocron -ett \"We're in a spot of bother.\" bob\x1b[0m
+    ... to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext to the terminal.
+
+    \x1b[1m./holocron -dff hello.asc bob\x1b[0m
+    ... to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save the resulting plaintext to `hello.txt`.
+
+    \x1b[1m./holocron -dft hello.asc bob\x1b[0m
+    ... to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and print the resulting plaintext to the terminal.
+
+    \x1b[1m./holocron -c\x1b[0m to clear all keys, i.e. delete the `keys` folder in the current directory.
+    
+    Note that if you compile in debug mode and run at the same time with `cargo run`, you'll need to prefix any arguments with `--`, thus: \x1b[1m./holocron -- -g bob\x1b[0m.\n";
+
+    if env::args().len() < 2 {
+        println!("\nInsufficient arguments.\n{}", usage);
+        return;
+    }
+
+    let args: Vec<String> = env::args().collect();
+    match args[1].as_str() {
+        "-c" => c_for_clear_all_keys(),
+        "-g" => g_for_generate_keys(&args, &usage),
+        "-eff" => eff_for_encrypt_from_file_to_file(&args, &usage),
+        "-etf" => etf_for_encrypt_from_terminal_to_file(&args, &usage),
+        "-ett" => ett_for_encrypt_from_terminal_to_terminal(&args, &usage),
+        "-dff" => dff_for_decrypt_from_file_to_file(&args, &usage),
+        "-dft" => dft_for_decrypt_from_file_to_terminal(&args, &usage),
+        _ => println!("Command not found.\n{}", usage),
+    }
+}
 
 // ----- Encryption side errors -----
 
@@ -38,10 +82,10 @@ enum EncryptionError {
 impl std::fmt::Display for EncryptionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EncryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
-            EncryptionError::AesError(e) => write!(f, "AES encryption failed: {}", e),
-            EncryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
-            EncryptionError::RsaError(e) => write!(f, "RSA operation failed: {}", e),
+            EncryptionError::KyberError(e) => write!(f, "Kyber operation failed:\n{}", e),
+            EncryptionError::AesError(e) => write!(f, "AES encryption failed:\n{}", e),
+            EncryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed:\n{}", e),
+            EncryptionError::RsaError(e) => write!(f, "RSA operation failed:\n{}", e),
         }
     }
 }
@@ -64,13 +108,13 @@ enum DecryptionError {
 impl std::fmt::Display for DecryptionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecryptionError::Base64Error(e) => write!(f, "Base64 decoding error: {}", e),
+            DecryptionError::Base64Error(e) => write!(f, "Base64 decoding error:\n{}", e),
             DecryptionError::InvalidFormat => write!(f, "Invalid message format"),
-            DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error: {}", e),
-            DecryptionError::AesError(e) => write!(f, "Decryption error: {}", e),
-            DecryptionError::KyberError(e) => write!(f, "Kyber operation failed: {}", e),
-            DecryptionError::RsaError(e) => write!(f, "rsa operation failed: {}", e),
-            DecryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed: {}", e),
+            DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error:\n{}", e),
+            DecryptionError::AesError(e) => write!(f, "Decryption error:\n{}", e),
+            DecryptionError::KyberError(e) => write!(f, "Kyber operation failed:\n{}", e),
+            DecryptionError::RsaError(e) => write!(f, "rsa operation failed:\n{}", e),
+            DecryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed:\n{}", e),
         }
     }
 }
@@ -110,10 +154,11 @@ fn generate_kyber_keys() -> (
     MlKem1024::generate(&mut OsRng)
 }
 
-fn generate_rsa_keys() -> (RsaPrivateKey, RsaPublicKey) {
-    let secret_key = RsaPrivateKey::new(&mut OsRng, 2048).expect("failed to generate a key");
+fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey), Box<dyn Error>> {
+    let secret_key = RsaPrivateKey::new(&mut OsRng, 2048)
+        .map_err(|e| format!("Failed to generate RSA private key:\n{}", e))?;
     let public_key = RsaPublicKey::from(&secret_key);
-    (secret_key, public_key)
+    Ok((secret_key, public_key))
 }
 
 // ----- Encryption functions -----
@@ -330,7 +375,16 @@ fn generate_keys(
     std::io::Error,
 > {
     let (kyber_dk, kyber_ek) = generate_kyber_keys();
-    let (rsa_dk, rsa_ek) = generate_rsa_keys();
+    let (rsa_dk, rsa_ek) = match generate_rsa_keys() {
+        Ok((dk, ek)) => (dk, ek),
+        Err(e) => {
+            eprintln!("Error generating RSA keys:\n{}", e);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                e.to_string(),
+            ));
+        }
+    };
 
     save_keys(username, &kyber_dk, &kyber_ek, &rsa_dk, &rsa_ek)?;
 
@@ -386,34 +440,47 @@ fn save_keys(
 
 fn parse_public_key(
     path: &str,
-) -> Result<(EncapsulationKey<MlKem1024Params>, RsaPublicKey), std::io::Error> {
-    let mut file = File::open(&path)?;
+) -> Result<(EncapsulationKey<MlKem1024Params>, RsaPublicKey), io::Error> {
+    let mut file = File::open(&path).map_err(|e| io::Error::new(io::ErrorKind::NotFound, e))?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    file.read_to_string(&mut contents)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
     let trimmed = contents
         .strip_prefix("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n")
-        .unwrap()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid public key format"))?
         .strip_suffix("\n\n-----END HOLOCRON PUBLIC KEY-----")
-        .unwrap();
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Invalid public key format"))?;
 
-    let bytes = Base64::decode_vec(&trimmed).unwrap();
+    let bytes = Base64::decode_vec(&trimmed).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Base64 decode error:\n{}", e),
+        )
+    })?;
+
     let kyber_bytes = bytes[..1568].to_vec();
     let rsa_bytes = bytes[1568..].to_vec();
 
-    let kyber_array: [u8; 1568] = kyber_bytes[..].try_into().expect("Wrong length");
+    let kyber_array: [u8; 1568] = kyber_bytes[..]
+        .try_into()
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Wrong length for kyber bytes"))?;
     let encoded = Encoded::<EncapsulationKey<MlKem1024Params>>::from(kyber_array);
     let kyber_ek = EncapsulationKey::<MlKem1024Params>::from_bytes(&encoded);
 
-    let rsa_ek =
-        RsaPublicKey::from_public_key_der(&rsa_bytes).expect("Failed to decode RSA public key");
+    let rsa_ek = RsaPublicKey::from_public_key_der(&rsa_bytes).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Failed to decode RSA public key",
+        )
+    })?;
 
     Ok((kyber_ek, rsa_ek))
 }
 
 fn parse_secret_key(
     path: &str,
-) -> Result<(DecapsulationKey<MlKem1024Params>, RsaPrivateKey), std::io::Error> {
+) -> Result<(DecapsulationKey<MlKem1024Params>, RsaPrivateKey), io::Error> {
     let mut file = File::open(&path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -432,7 +499,6 @@ fn parse_secret_key(
         )
     })?;
 
-    // Make sure we have enough bytes
     if bytes.len() < 3168 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -458,16 +524,36 @@ fn parse_secret_key(
 }
 
 fn confirm_deletion() -> bool {
-    let current_dir = env::current_dir().unwrap();
+    use std::{env, io};
+
+    let current_dir = match env::current_dir() {
+        Ok(dir) => dir,
+        Err(_) => {
+            eprintln!("Error: Unable to determine the current directory.");
+            return false;
+        }
+    };
+
     let dir_name = current_dir.file_name().unwrap_or_default();
+    let dir_name_str = dir_name.to_str().unwrap_or("the current directory");
+
+    let full_path_str = current_dir.to_str().unwrap_or("an unnamable path");
 
     let mut input = String::new();
-    print!(
-        "Are you sure you want to delete all keys in {}? (Y/N): ",
-        dir_name.to_str().unwrap_or("unknown")
+    println!(
+        "Are you sure you want to delete all keys in {}?\n(Full path: {})\n(Y/N): ",
+        dir_name_str, full_path_str
     );
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(&mut input).unwrap();
+
+    if let Err(e) = io::stdout().flush() {
+        eprintln!("Error: Unable to flush stdout:\n{}", e);
+        return false;
+    }
+
+    if let Err(e) = io::stdin().read_line(&mut input) {
+        eprintln!("Error: Unable to read input:\n{}", e);
+        return false;
+    }
 
     match input.trim().to_lowercase().as_str() {
         "y" | "yes" => true,
@@ -475,221 +561,393 @@ fn confirm_deletion() -> bool {
     }
 }
 
-fn delete_keys_folder() -> Result<(), std::io::Error> {
+fn delete_keys_folder() -> Result<(), io::Error> {
     let current_dir = env::current_dir()?;
-    println!("Current working directory: {}", current_dir.display());
-
     let folder_path = current_dir.join("keys");
-    println!("Checking path: {}", folder_path.display());
 
     if folder_path.exists() {
         fs::remove_dir_all(&folder_path)?;
-        println!("Keys folder deleted successfully.");
+        Ok(())
     } else {
-        println!("Keys folder does not exist at: {}", folder_path.display());
+        let err_msg = format!("Keys folder does not exist at:\n{}", folder_path.display());
+        Err(io::Error::new(io::ErrorKind::NotFound, err_msg))
     }
-    Ok(())
 }
 
-fn main() {
-    let usage = "\nUsage:
+fn c_for_clear_all_keys() {
+    if confirm_deletion() {
+        match delete_keys_folder() {
+            Ok(_) => println!("Keys folder successfully deleted."),
+            Err(e) => eprintln!("Failed to delete keys folder:\n{}", e),
+        }
+    } else {
+        println!("Exiting without deleting keys.");
+    }
+}
 
-    \x1b[1m./holocron -g alice\x1b[0m
-    ... to generate keys for Alice and save them as `alice_secret.asc` and `alice_public.asc` in the folder `keys`, creating the folder `keys` if it doesn't exist.
-
-    \x1b[1m./holocron -e \"We're in a spot of bother.\" bob\x1b[0m
-    ... to encrypt a message for Bob with the publi key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext.
-
-    \x1b[1m./holocron -ef hello.txt bob\x1b[0m
-    ... to encrypt the message in `hello.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save it to `hello.asc`.
-
-    \x1b[1m./holocron -df ciphertext bob\x1b[0m
-    ... to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save it to `hello.txt`.
-
-    \x1b[1m./holocron -c\x1b[0m to clear all keys, i.e. delete the `keys` folder in the current directory.
-    
-    Note that if you compile in debug mode and run at the same time with `cargo run`, you'll need to prefix any arguments with `--`, thus: \x1b[1m./holocron -- -g alice\x1b[0m.\n";
-
-    if env::args().len() < 2 {
-        println!("\nInsufficient arguments.\n{}", usage);
+fn g_for_generate_keys(args: &Vec<String>, usage: &str) {
+    if args.len() < 3 {
+        println!(
+            "This command requires three arguments, including the program name.\n{}",
+            &usage
+        );
         return;
     }
 
-    let args: Vec<String> = env::args().collect();
-    match args[1].as_str() {
-        "-c" => {
-            if confirm_deletion() {
-                delete_keys_folder().expect("Failed to delete keys folder");
-            } else {
-                println!("Exiting without deleting keys.");
-            }
-        }
-        "-g" => {
-            if args.len() < 3 {
-                println!(
-                    "This command requires three arguments, including the program name.\n{}",
-                    &usage
-                );
-                return;
-            }
-            let username = &args[2];
-            generate_keys(username).expect("Failed to generate keys");
-        }
-        "-d" => {
-            if args.len() < 4 {
-                println!(
-                    "This command requires four arguments, including the program name.\n{}",
-                    &usage
-                );
-                return;
-            }
-            let ciphertext_file = &args[2];
-            let username = &args[3];
+    let username = &args[2];
 
-            let file_path = std::env::current_dir()
-                .unwrap()
-                .join("keys")
-                .join(format!("{}_secret_key.asc", username));
-
-            if !file_path.exists() {
-                println!("Secret key file not found at: {}", file_path.display());
-                return;
-            }
-
-            let ciphertext =
-                read_to_string(ciphertext_file).expect("Failed to read ciphertext file");
-
-            let (kyber_dk, rsa_dk) =
-                parse_secret_key(&file_path.to_string_lossy()).expect("Failed to parse secret key");
-
-            let decrypted = decrypt(&ciphertext, &kyber_dk, &rsa_dk).expect("Failed to decrypt");
-
-            println!("{}", decrypted);
-        }
-        "-e" => {
-            if args.len() < 4 {
-                println!(
-                    "This command requires four arguments, including the program name.\n{}",
-                    &usage
-                );
-                return;
-            }
-            let plaintext = &args[2];
-            let username = &args[3];
-
-            let file_path = std::env::current_dir()
-                .unwrap()
-                .join("keys")
-                .join(format!("{}_public_key.asc", username));
-            let (kyber_ek, rsa_ek) = parse_public_key(&file_path.to_string_lossy()).unwrap();
-
-            let encrypted =
-                &encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek).expect("Failed to encrypt");
-
-            let ciphertext = format!(
-                "{}\n\n{}\n\n{}",
-                "-----BEGIN HOLOCRON MESSAGE-----".to_string(),
-                encrypted,
-                "-----END HOLOCRON MESSAGE-----".to_string()
-            );
-
-            println!("{}", ciphertext);
-        }
-        "-ef" => {
-            if args.len() < 4 {
-                println!(
-                    "This command requires four arguments, including the program name.\n{}",
-                    &usage
-                );
-                return;
-            }
-            let plaintext_file = &args[2];
-            let username = &args[3];
-
-            let file_path = std::env::current_dir()
-                .unwrap()
-                .join("keys")
-                .join(format!("{}_public_key.asc", username));
-
-            if !file_path.exists() {
-                println!("Public key file not found at: {}", file_path.display());
-                return;
-            }
-
-            let plaintext = read_to_string(plaintext_file).expect("Failed to read plaintext file");
-
-            let file_path = std::env::current_dir()
-                .unwrap()
-                .join("keys")
-                .join(format!("{}_public_key.asc", username));
-
-            let (kyber_ek, rsa_ek) =
-                parse_public_key(&file_path.to_string_lossy()).expect("Failed to parse public key");
-
-            let encrypted =
-                encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek).expect("Failed to encrypt");
-
-            let file_name = plaintext_file
-                .strip_suffix(".txt")
-                .unwrap_or(plaintext_file)
-                .to_string();
-
-            let ciphertext_file = format!("{}.asc", file_name);
-            let ciphertext = format!(
-                "{}\n\n{}\n\n{}",
-                "-----BEGIN HOLOCRON MESSAGE-----".to_string(),
-                encrypted,
-                "-----END HOLOCRON MESSAGE-----".to_string()
-            );
-
-            let mut file =
-                File::create(&ciphertext_file).expect("Failed to create ciphertext file");
-            use std::io::Write;
-            file.write_all(ciphertext.as_bytes())
-                .expect("Failed to write ciphertext");
-
-            println!("Ciphertext saved to `{}`.", ciphertext_file);
-        }
-        "-df" => {
-            if args.len() < 4 {
-                println!(
-                    "This command requires four arguments, including the program name.\n{}",
-                    &usage
-                );
-                return;
-            }
-            let ciphertext_file = &args[2];
-            let username = &args[3];
-
-            let file_path = std::env::current_dir()
-                .unwrap()
-                .join("keys")
-                .join(format!("{}_secret_key.asc", username));
-
-            if !file_path.exists() {
-                println!("Secret key file not found at: {}", file_path.display());
-                return;
-            }
-
-            let ciphertext =
-                read_to_string(ciphertext_file).expect("Failed to read ciphertext file");
-
-            let (kyber_dk, rsa_dk) =
-                parse_secret_key(&file_path.to_string_lossy()).expect("Failed to parse secret key");
-
-            let decrypted = decrypt(&ciphertext, &kyber_dk, &rsa_dk).expect("Failed to decrypt");
-
-            let decrypted_file = format!("{}.txt", ciphertext_file.strip_suffix(".asc").unwrap());
-
-            let mut file = File::create(&decrypted_file).expect("Failed to create plaintext file");
-            use std::io::Write;
-            file.write_all(decrypted.as_bytes())
-                .expect("Failed to write plaintext");
-
-            println!("Plaintext saved to `{}`.", decrypted_file);
-        }
-        _ => panic!("Command not found.\n{}", usage),
+    if let Err(e) = generate_keys(username) {
+        eprintln!("Error: Failed to generate keys for `{}`:\n{}", username, e);
+    } else {
+        println!("Keys successfully generated for `{}`.", username);
     }
+}
+
+fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
+    if args.len() < 4 {
+        println!(
+            "This command requires four arguments, including the program name.\n{}",
+            usage
+        );
+        return;
+    }
+
+    let plaintext_file = &args[2];
+    let username = &args[3];
+
+    let file_path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir
+            .join("keys")
+            .join(format!("{}_public_key.asc", username)),
+        Err(e) => {
+            println!("Failed to get current directory:\n{}", e);
+            return;
+        }
+    };
+
+    if !file_path.exists() {
+        println!("Public key file not found at:\n{}", file_path.display());
+        return;
+    }
+
+    let plaintext = match fs::read_to_string(plaintext_file) {
+        Ok(content) => content,
+        Err(e) => {
+            println!("Failed to read plaintext file `{}`:\n{}", plaintext_file, e);
+            return;
+        }
+    };
+
+    let (kyber_ek, rsa_ek) = match parse_public_key(&file_path.to_string_lossy()) {
+        Ok(keys) => keys,
+        Err(e) => {
+            println!(
+                "Failed to parse public key at: `{}`\n{}",
+                file_path.display(),
+                e
+            );
+            return;
+        }
+    };
+
+    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+        Ok(enc) => enc,
+        Err(e) => {
+            println!("Encryption failed:\n{}", e);
+            return;
+        }
+    };
+
+    let file_name = Path::new(plaintext_file)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(plaintext_file);
+
+    let ciphertext_file = format!("{}.asc", file_name);
+    let ciphertext = format!(
+        "{}\n\n{}\n\n{}",
+        "-----BEGIN HOLOCRON MESSAGE-----", encrypted, "-----END HOLOCRON MESSAGE-----"
+    );
+
+    let mut file = match File::create(&ciphertext_file) {
+        Ok(f) => f,
+        Err(e) => {
+            println!(
+                "Failed to create ciphertext file `{}`:\n{}",
+                ciphertext_file, e
+            );
+            return;
+        }
+    };
+
+    if let Err(e) = file.write_all(ciphertext.as_bytes()) {
+        println!(
+            "Failed to write ciphertext to file `{}`:\n{}",
+            ciphertext_file, e
+        );
+        return;
+    }
+
+    println!("Ciphertext saved to `{}`.", ciphertext_file);
+}
+
+fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str) {
+    if args.len() < 4 {
+        println!(
+            "This command requires four arguments, including the program name.\n{}",
+            usage
+        );
+        return;
+    }
+
+    let plaintext = &args[2];
+    let username = &args[3];
+
+    let file_path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir
+            .join("keys")
+            .join(format!("{}_public_key.asc", username)),
+        Err(e) => {
+            println!("Failed to get current directory:\n{}", e);
+            return;
+        }
+    };
+
+    let key_file_path = file_path.to_string_lossy().to_string();
+    let (kyber_ek, rsa_ek) = match parse_public_key(&key_file_path) {
+        Ok(keys) => keys,
+        Err(e) => {
+            println!(
+                "Failed to parse public key file at: {}\n{}",
+                key_file_path, e
+            );
+            return;
+        }
+    };
+
+    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+        Ok(enc) => enc,
+        Err(e) => {
+            println!("Encryption failed:\n{}", e);
+            return;
+        }
+    };
+
+    let ciphertext = format!(
+        "{}\n\n{}\n\n{}",
+        "-----BEGIN HOLOCRON MESSAGE-----", encrypted, "-----END HOLOCRON MESSAGE-----"
+    );
+
+    println!("{}", ciphertext);
+}
+
+fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
+    if args.len() < 4 {
+        println!(
+            "This command requires four arguments, including the program name.\n{}",
+            usage
+        );
+        return;
+    }
+
+    let plaintext = &args[2];
+    let username = &args[3];
+
+    let file_path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir
+            .join("keys")
+            .join(format!("{}_public_key.asc", username)),
+        Err(e) => {
+            println!("Failed to get current directory:\n{}", e);
+            return;
+        }
+    };
+
+    let key_file_path = file_path.to_string_lossy().to_string();
+    let (kyber_ek, rsa_ek) = match parse_public_key(&key_file_path) {
+        Ok(keys) => keys,
+        Err(e) => {
+            println!(
+                "Failed to parse public key file at: {}\n{}",
+                key_file_path, e
+            );
+            return;
+        }
+    };
+
+    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+        Ok(enc) => enc,
+        Err(e) => {
+            println!("Encryption failed:\n{}", e);
+            return;
+        }
+    };
+
+    let ciphertext = format!(
+        "{}\n\n{}\n\n{}",
+        "-----BEGIN HOLOCRON MESSAGE-----", encrypted, "-----END HOLOCRON MESSAGE-----"
+    );
+
+    let mut file = match File::create("ciphertext.asc") {
+        Ok(f) => f,
+        Err(e) => {
+            println!("Failed to create ciphertext file:\n{}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = file.write_all(ciphertext.as_bytes()) {
+        println!("Failed to write ciphertext to file:\n{}", e);
+        return;
+    }
+
+    println!("Ciphertext saved to `ciphertext.asc`.");
+}
+
+fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
+    if args.len() < 4 {
+        println!(
+            "This command requires four arguments, including the program name.\n{}",
+            usage
+        );
+        return;
+    }
+
+    let ciphertext_file = &args[2];
+    let username = &args[3];
+
+    let file_path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir
+            .join("keys")
+            .join(format!("{}_secret_key.asc", username)),
+        Err(e) => {
+            println!("Failed to get current directory:\n{}", e);
+            return;
+        }
+    };
+
+    if !file_path.exists() {
+        println!("Secret key file not found at:\n{}", file_path.display());
+        return;
+    }
+
+    let ciphertext = match fs::read_to_string(ciphertext_file) {
+        Ok(content) => content,
+        Err(e) => {
+            println!(
+                "Failed to read ciphertext file `{}`:\n{}",
+                ciphertext_file, e
+            );
+            return;
+        }
+    };
+
+    let (kyber_dk, rsa_dk) = match parse_secret_key(&file_path.to_string_lossy()) {
+        Ok(keys) => keys,
+        Err(e) => {
+            println!(
+                "Failed to parse secret key file `{}`:\n{}",
+                file_path.display(),
+                e
+            );
+            return;
+        }
+    };
+
+    let decrypted = match decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
+        Ok(message) => message,
+        Err(e) => {
+            println!("Failed to decrypt the message:\n{}", e);
+            return;
+        }
+    };
+
+    let decrypted_file = match ciphertext_file.strip_suffix(".asc") {
+        Some(base) => format!("{}.txt", base),
+        None => format!("{}_decrypted.txt", ciphertext_file),
+    };
+
+    let mut file = match fs::File::create(&decrypted_file) {
+        Ok(file) => file,
+        Err(e) => {
+            println!(
+                "Failed to create plaintext file `{}`:\n{}",
+                decrypted_file, e
+            );
+            return;
+        }
+    };
+
+    if let Err(e) = file.write_all(decrypted.as_bytes()) {
+        println!(
+            "Failed to write to plaintext file `{}`:\n{}",
+            decrypted_file, e
+        );
+        return;
+    }
+
+    println!("Plaintext saved to `{}`.", decrypted_file);
+}
+
+fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
+    if args.len() < 4 {
+        println!(
+            "This command requires four arguments, including the program name.\n{}",
+            usage
+        );
+        return;
+    }
+
+    let ciphertext_file = &args[2];
+    let username = &args[3];
+
+    let file_path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir
+            .join("keys")
+            .join(format!("{}_secret_key.asc", username)),
+        Err(e) => {
+            println!("Failed to get current directory:\n{}", e);
+            return;
+        }
+    };
+
+    if !file_path.exists() {
+        println!("Secret key file not found at:\n{}", file_path.display());
+        return;
+    }
+
+    let ciphertext = match fs::read_to_string(ciphertext_file) {
+        Ok(content) => content,
+        Err(e) => {
+            println!(
+                "Failed to read ciphertext file `{}`:\n{}",
+                ciphertext_file, e
+            );
+            return;
+        }
+    };
+
+    let (kyber_dk, rsa_dk) = match parse_secret_key(&file_path.to_string_lossy()) {
+        Ok(keys) => keys,
+        Err(e) => {
+            println!(
+                "Failed to parse secret key file `{}`:\n{}",
+                file_path.display(),
+                e
+            );
+            return;
+        }
+    };
+
+    let decrypted = match decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
+        Ok(message) => message,
+        Err(e) => {
+            println!("Failed to decrypt the message:\n{}", e);
+            return;
+        }
+    };
+
+    println!("{}", decrypted);
 }
 
 #[cfg(test)]
@@ -701,21 +959,19 @@ mod tests {
         let alice_plaintext = "We're in a spot of bother.";
 
         let (bob_kyber_dk, bob_kyber_ek) = generate_kyber_keys();
-        let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys();
+        let (bob_rsa_dk, bob_rsa_ek) = generate_rsa_keys().expect("Failed to generate RSA keys");
 
-        match encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek) {
-            Ok(wire_message) => match decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk) {
-                Ok(bob_plaintext) => {
-                    assert_eq!(
-                        alice_plaintext, &bob_plaintext,
-                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                        alice_plaintext, bob_plaintext
-                    );
-                }
-                Err(e) => panic!("{}", e),
-            },
-            Err(e) => panic!("{}", e),
-        }
+        let wire_message = encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek)
+            .expect("Failed to encrypt message");
+
+        let bob_plaintext =
+            decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk).expect("Failed to decrypt message");
+
+        assert_eq!(
+            alice_plaintext, &bob_plaintext,
+            "Message mismatch.\nAlice: `{}`\nBob: `{}`",
+            alice_plaintext, bob_plaintext
+        );
     }
 
     #[test]
