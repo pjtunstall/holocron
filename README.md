@@ -59,8 +59,8 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Definitely to do:
 
+- Structure: modularize.
 - Add more tests: of success and failure responses to each operation.
-- Modularize.
 
 Possible further developments include:
 
