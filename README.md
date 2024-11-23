@@ -59,9 +59,8 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Definitely to do:
 
-- Check import conventions as described in the Book.
 - Check variable names for consistency and expressiveness.
-- Structure: modularize, e.g. into `encryption`, `decryption`, `keys`, `options`.
+- Structure: modularize, e.g. into `encryption`, `decryption`, `keys`, `options`, and maybe split the first two into their Kyber and RSA parts.
 - Add more tests: of success and failure responses to each operation.
 
 Possible further developments include:

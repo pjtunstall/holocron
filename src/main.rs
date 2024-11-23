@@ -21,7 +21,7 @@ use sha2::Sha256;
 use std::{
     env,
     error::Error,
-    fs::{self, create_dir, File},
+    fs::{self, File},
     io::{self, Read, Write},
     path::Path,
 };
@@ -399,7 +399,7 @@ fn save_keys(
     rsa_ek: &RsaPublicKey,
 ) -> io::Result<()> {
     if !Path::new("keys").is_dir() {
-        create_dir("keys")?;
+        fs::create_dir("keys")?;
     }
 
     let kyber_dk_bytes = kyber_dk.as_bytes().to_vec();
