@@ -6,11 +6,17 @@ A command-line interface for encrypting and decrypting messages with a hybrid cr
 
 ## What's it for?
 
-Fun. An exercise to help me learn Rust.
+Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise awareness.
+
+(https://en.wikipedia.org/wiki/Quantum_computing)[Quantum computers] are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
+
+If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become more common. [Signal](https://signal.org/docs/specifications/pqxdh/), [https://security.apple.com/blog/imessage-pq3/](Apple), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
+
+This project is my attempt.
 
 ## Should I trust my life to it?
 
-No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues.
+No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve it, but, for now and the foreseeable future, consider it just a learning exercise.
 
 ## Usage
 
@@ -40,7 +46,7 @@ Note that if you compile in debug mode with `cargo run`, you'll need to prefix a
 
 I'm using the following algorithms:
 
-- Post-quantum asymmetric: ML-KEM-1024, aka Kyber
+- Post-quantum asymmetric: formally ML-KEM-1024, aka (CRYSTALS-)Kyber
 - Classical aymmetric: RSA
 - Ephemeral key generation: SHA-256
 - Symmetric: AES-256-GCM
@@ -53,7 +59,7 @@ The encrypted message consists of the following items concatenated:
 - RSA nonce
 - Message
 
-For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specifically ML-KEM1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange, `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA256) as a hash function for generating the ephemeral keys. They state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
+For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange, `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA256) as a hash function for generating the ephemeral keys. They state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
 
 ## Further
 
