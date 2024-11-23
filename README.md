@@ -2,7 +2,7 @@
 
 ## What is this?
 
-A program to encrypt and decrypt messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. In this way, in principle, messages should be at least as secure as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer.
+A command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. In this way, in principle, messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer.
 
 ## What's it for?
 
