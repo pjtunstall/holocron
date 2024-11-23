@@ -24,9 +24,9 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 
 `./holocron -eff hello.txt bob` to encrypt the message in `hello.txt` with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `hello.asc`.
 
-`./holocron -etf \"We're in a spot of bother.\" bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `ciphertext.asc`.
+`./holocron -etf "We're in a spot of bother." bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and save the resulting ciphertext to `ciphertext.asc`.
 
-`./holocron -ett \"We're in a spot of bother.\" bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext to the terminal.
+`./holocron -ett "We're in a spot of bother." bob` to encrypt the given message for Bob with the public key `bob_public.asc`, located in the folder `keys`, and print the resulting ciphertext to the terminal.
 
 `./holocron -dff hello.asc bob` to decrypt the message in `hello.asc` with the secret key `bob_secret.asc`, located in the folder `keys`, and save the resulting plaintext to `hello.txt`.
 
