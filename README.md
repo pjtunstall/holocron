@@ -65,7 +65,8 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Definitely to do:
 
-- Structure: modularize, e.g. into `encryption`, `decryption`, `keys`, `options`, and maybe split the first two into their Kyber and RSA parts.
+- Structure: modularize further: split `encryption` and `decryption` into their Kyber and RSA parts; split `keys` into `public` and `secret`; separate `errors` for each module?
+- Remove that first test and only test `generate_kyber_keys` and `generate_rsa_keys` locally to the keys module.
 - Check variable names for consistency and expressiveness.
 - Add more tests: of success and failure responses to each operation.
 
