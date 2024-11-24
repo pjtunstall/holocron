@@ -8,7 +8,7 @@ A command-line interface for encrypting and decrypting messages with a hybrid cr
 
 Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise awareness.
 
-(https://en.wikipedia.org/wiki/Quantum_computing)[Quantum computers] are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
+[https://en.wikipedia.org/wiki/Quantum_computing](Quantum computers) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
 
 If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh/), [https://security.apple.com/blog/imessage-pq3/](Apple), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
 
@@ -79,11 +79,11 @@ The encrypted message consists of the following items concatenated:
 
 For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange, `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
 
-## Todo
-
-- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation.
-
 ## Possible further developments
+
+Tests:
+
+- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation. Although the current integration test in `options.rs` verifies that the core system all works, and hence that it's components work, it would be useful to add finer grained tests before making radical changes to any of those components, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
 
 Basic features:
 
@@ -100,7 +100,7 @@ Better security:
 
 - Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
 - Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
-- Switch to more reliable dependencies for the core algorithms.
+- Switch to more reliable dependencies for the cryptographic algorithms.
 
 UI:
 
