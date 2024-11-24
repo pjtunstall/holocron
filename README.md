@@ -56,7 +56,7 @@ Modern cryptosystems, therefore, use an asymmetric algorithm to encrypt a symmet
 
 Alice then sends the encrypted symmetric key and message to Bob. Bob decrypts the symmetric key with his secret key and uses it to decrypt the message.
 
-This is the basic idea. Actual systems may include further subtleties. For example, asymemtric systems often use a combination of static (i.e. persistent) keys and ephemeral/session keys to ensure [forward secrecy](https://en.wikipedia.org/wiki/Forward_secrecy). That is, to ensure that previous messages can't be read even if the notorious Eve gains access to Bob's static secret key.
+This is the basic idea. Actual systems may include further subtleties. For example, asymemtric systems such a Diffie-Hellman use a combination of static (i.e. persistent) keys and ephemeral/session keys to ensure [forward secrecy](https://en.wikipedia.org/wiki/Forward_secrecy). That is, to ensure that previous messages can't be read even if the notorious Eve gains access to Bob's static secret key.
 
 Now, symmetric algorithms are thought to be resistant to quantum attack, provided a reasonably large key is used. It's the asymmetric algorithms that are at risk. The current standard, widely-used public-key exchange mechanisms, such as RSA, will be vulnerable when quantum computers reacha certain size. In the last couple of years, a few quantum-proof key-exchange mechanisms have been proposed, but it's early days and it's possible that flaws will be found. Already some supposedly quantum-proof algorithms, have been cracked with classical (non-quantum) techniques.
 
