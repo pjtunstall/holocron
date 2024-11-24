@@ -108,4 +108,4 @@ UI:
 
 Messaging:
 
-- Build a messaging syste on top of it.
+- Build a messaging system on top of it.
