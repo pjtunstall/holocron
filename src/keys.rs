@@ -19,7 +19,7 @@ use std::{
     path::Path,
 };
 
-// -----Key errors-----
+// ----- Key errors -----
 
 #[derive(Debug)]
 pub enum KeyError {
@@ -31,7 +31,7 @@ impl fmt::Display for KeyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             KeyError::DerivationFailed(err) => write!(f, "Key derivation failed:\n{}", err),
-            KeyError::GenerationFailed(err) => write!(f, "Key genration failed:\n{}", err),
+            KeyError::GenerationFailed(err) => write!(f, "Key generation failed:\n{}", err),
         }
     }
 }
@@ -87,6 +87,22 @@ fn save_keys(
     rsa_dk: &RsaPrivateKey,
     rsa_ek: &RsaPublicKey,
 ) -> io::Result<()> {
+    let file_path_for_secret_key = format!("keys/{}_secret_key.asc", username);
+    if Path::new(&file_path_for_secret_key).exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("File `{}` already exists.", file_path_for_secret_key),
+        ));
+    }
+
+    let file_path_for_public_key = format!("keys/{}_public_key.asc", username);
+    if Path::new(&file_path_for_public_key).exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("File `{}` already exists.", file_path_for_public_key),
+        ));
+    }
+
     if !Path::new("keys").is_dir() {
         fs::create_dir("keys")?;
     }
@@ -99,7 +115,7 @@ fn save_keys(
         .map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("Failed to serialize RSA private key: {}", e),
+                format!("Failed to serialize RSA private key:\n{}", e),
             )
         })?
         .as_bytes()
@@ -109,7 +125,7 @@ fn save_keys(
         .map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("Failed to serialize RSA public key: {}", e),
+                format!("Failed to serialize RSA public key:\n{}", e),
             )
         })?
         .as_bytes()
@@ -140,16 +156,14 @@ fn save_keys(
     secret_key_str.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
     secret_key_str.push_str(&Base64::encode_string(&secret_key));
     secret_key_str.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
-
-    let mut file = File::create(format!("keys/{}_secret_key.asc", username))?;
+    let mut file = File::create(file_path_for_secret_key)?;
     file.write_all(secret_key_str.as_bytes())?;
 
     let mut public_key_str = String::new();
     public_key_str.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
     public_key_str.push_str(&Base64::encode_string(&public_key));
     public_key_str.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
-
-    let mut file = File::create(format!("keys/{}_public_key.asc", username))?;
+    let mut file = File::create(file_path_for_public_key)?;
     file.write_all(public_key_str.as_bytes())?;
 
     Ok(())
@@ -256,7 +270,7 @@ pub fn confirm_deletion() -> bool {
 
     let mut input = String::new();
     println!(
-        "Are you sure you want to delete all keys in {}?\n(Full path: {})\n(Y/N): ",
+        "Are you sure you want to delete all keys in {}?\n(Full path: `{}`)\n(Y/N): ",
         dir_name_str, full_path_str
     );
 
@@ -284,7 +298,10 @@ pub fn delete_keys_folder() -> Result<(), io::Error> {
         fs::remove_dir_all(&folder_path)?;
         Ok(())
     } else {
-        let err_msg = format!("Keys folder does not exist at:\n{}", folder_path.display());
+        let err_msg = format!(
+            "Keys folder does not exist at:\n`{}`",
+            folder_path.display()
+        );
         Err(io::Error::new(io::ErrorKind::NotFound, err_msg))
     }
 }
