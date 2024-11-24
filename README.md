@@ -8,9 +8,9 @@ A command-line interface for encrypting and decrypting messages with a hybrid cr
 
 Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise awareness.
 
-[https://en.wikipedia.org/wiki/Quantum_computing](Quantum computers) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
+[Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
 
-If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh/), [https://security.apple.com/blog/imessage-pq3/](Apple), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
+If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh/), [Apple](https://security.apple.com/blog/imessage-pq3/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
 
 This project is my attempt.
 
