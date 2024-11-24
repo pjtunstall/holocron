@@ -222,7 +222,8 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
         "-----BEGIN HOLOCRON MESSAGE-----", encrypted, "-----END HOLOCRON MESSAGE-----"
     );
 
-    let mut file = match File::create("message.asc") {
+    let path = "message.asc";
+    let mut file = match File::create(path) {
         Ok(f) => f,
         Err(e) => {
             println!("Failed to create ciphertext file:\n{}", e);
@@ -235,7 +236,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
         return;
     }
 
-    println!("Ciphertext saved to `ciphertext.asc`.");
+    println!("Ciphertext saved to `{}`.", path);
 }
 
 pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
