@@ -389,27 +389,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generate_keys_without_saving_then_encrypts_and_decrypt() {
-        let alice_plaintext = "We're in a spot of bother.";
-
-        let (bob_kyber_dk, bob_kyber_ek) = keys::generate_kyber_keys();
-        let (bob_rsa_dk, bob_rsa_ek) =
-            keys::generate_rsa_keys().expect("Failed to generate RSA keys");
-
-        let wire_message = encrypt(alice_plaintext.as_bytes(), &bob_kyber_ek, &bob_rsa_ek)
-            .expect("Failed to encrypt message");
-
-        let bob_plaintext =
-            decrypt(&wire_message, &bob_kyber_dk, &bob_rsa_dk).expect("Failed to decrypt message");
-
-        assert_eq!(
-            alice_plaintext, &bob_plaintext,
-            "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-            alice_plaintext, bob_plaintext
-        );
-    }
-
-    #[test]
     fn generate_keys_and_save_then_encrypt_and_decrypt() {
         let username = "bob";
         let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = keys::generate_keys(username).unwrap();

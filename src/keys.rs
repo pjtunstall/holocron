@@ -66,14 +66,14 @@ pub fn generate_keys(
     Ok((kyber_ek, kyber_dk, rsa_ek, rsa_dk))
 }
 
-pub fn generate_kyber_keys() -> (
+fn generate_kyber_keys() -> (
     DecapsulationKey<MlKem1024Params>,
     EncapsulationKey<MlKem1024Params>,
 ) {
     MlKem1024::generate(&mut OsRng)
 }
 
-pub fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey), Box<dyn Error>> {
+fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey), Box<dyn Error>> {
     let secret_key = RsaPrivateKey::new(&mut OsRng, 2048)
         .map_err(|e| format!("Failed to generate RSA private key:\n{}", e))?;
     let public_key = RsaPublicKey::from(&secret_key);
