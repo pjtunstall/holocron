@@ -81,7 +81,7 @@ For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml
 
 ## Todo
 
-- Add more tests: of success and failure responses to each operation. Test the various options, including encrypting from and to a file.
+- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation.
 
 ## Possible further developments
 
