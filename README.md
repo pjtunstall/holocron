@@ -42,6 +42,8 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 
 Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g bob`.
 
+To run the tests, run `cargo test`. Note that the integration test in `options.rs` assumes that keys for `bob` don't already exist in the `keys` folder in the current directory. If you want to run the test, either delete Bob's keys or move them elsewhere till after the test.
+
 ## In detail
 
 Cryptographic algorithms can be classified as either symmetric or asymmetric.

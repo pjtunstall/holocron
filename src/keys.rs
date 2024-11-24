@@ -80,6 +80,16 @@ fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey), Box<dyn Error>> 
     Ok((secret_key, public_key))
 }
 
+fn check_if_file_already_exists(file_path: &str) -> io::Result<()> {
+    if Path::new(&file_path).exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("File `{}` already exists.", file_path),
+        ));
+    }
+    Ok(())
+}
+
 fn save_keys(
     username: &str,
     kyber_dk: &DecapsulationKey<MlKem1024Params>,
@@ -88,20 +98,10 @@ fn save_keys(
     rsa_ek: &RsaPublicKey,
 ) -> io::Result<()> {
     let file_path_for_secret_key = format!("keys/{}_secret_key.asc", username);
-    if Path::new(&file_path_for_secret_key).exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("File `{}` already exists.", file_path_for_secret_key),
-        ));
-    }
+    check_if_file_already_exists(&file_path_for_secret_key)?;
 
     let file_path_for_public_key = format!("keys/{}_public_key.asc", username);
-    if Path::new(&file_path_for_public_key).exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("File `{}` already exists.", file_path_for_public_key),
-        ));
-    }
+    check_if_file_already_exists(&file_path_for_public_key)?;
 
     if !Path::new("keys").is_dir() {
         fs::create_dir("keys")?;
@@ -144,27 +144,36 @@ fn save_keys(
         ));
     }
 
-    let mut secret_key = Vec::new();
-    secret_key.extend_from_slice(&kyber_dk_bytes);
-    secret_key.extend_from_slice(&rsa_dk_bytes);
+    write_key(
+        "SECRET",
+        &kyber_dk_bytes,
+        &rsa_dk_bytes,
+        &file_path_for_secret_key,
+    )?;
+    write_key(
+        "PUBLIC",
+        &kyber_ek_bytes,
+        &rsa_ek_bytes,
+        &file_path_for_public_key,
+    )?;
 
-    let mut public_key = Vec::new();
-    public_key.extend_from_slice(&kyber_ek_bytes);
-    public_key.extend_from_slice(&rsa_ek_bytes);
+    Ok(())
+}
 
-    let mut secret_key_str = String::new();
-    secret_key_str.push_str("-----BEGIN HOLOCRON SECRET KEY-----\n\n");
-    secret_key_str.push_str(&Base64::encode_string(&secret_key));
-    secret_key_str.push_str("\n\n-----END HOLOCRON PRIVATE KEY-----");
-    let mut file = File::create(file_path_for_secret_key)?;
-    file.write_all(secret_key_str.as_bytes())?;
+fn write_key(kind: &str, kyber_bytes: &[u8], rsa_bytes: &[u8], path: &str) -> io::Result<()> {
+    let mut key = Vec::new();
+    key.extend_from_slice(&kyber_bytes);
+    key.extend_from_slice(&rsa_bytes);
 
-    let mut public_key_str = String::new();
-    public_key_str.push_str("-----BEGIN HOLOCRON PUBLIC KEY-----\n\n");
-    public_key_str.push_str(&Base64::encode_string(&public_key));
-    public_key_str.push_str("\n\n-----END HOLOCRON PUBLIC KEY-----");
-    let mut file = File::create(file_path_for_public_key)?;
-    file.write_all(public_key_str.as_bytes())?;
+    let mut key_string = String::new();
+    let header = format!("-----BEGIN HOLOCRON {} KEY-----\n\n", kind);
+    let footer = format!("\n\n-----END HOLOCRON {} KEY-----", kind);
+    key_string.push_str(&header);
+    key_string.push_str(&Base64::encode_string(&key));
+    key_string.push_str(&footer);
+
+    let mut file = File::create(path)?;
+    file.write_all(key_string.as_bytes())?;
 
     Ok(())
 }

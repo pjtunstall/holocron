@@ -152,7 +152,7 @@ pub fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse public key file at: {}\n{}",
+                "Failed to parse public key file at: `{}`\n{}",
                 key_file_path, e
             );
             return;
@@ -202,7 +202,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse public key file at: {}\n{}",
+                "Failed to parse public key file at: `{}`\n{}",
                 key_file_path, e
             );
             return;
@@ -391,6 +391,7 @@ mod tests {
     #[test]
     fn generate_keys_and_save_then_encrypt_and_decrypt() {
         let username = "bob";
+        std::env::set_current_dir(std::env::current_dir().unwrap()).unwrap();
         let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = keys::generate_keys(username).unwrap();
         let public_key_path = format!("keys/{}_public_key.asc", username);
         let (loaded_kyber_ek, loaded_rsa_ek) = keys::parse_public_key(&public_key_path).unwrap();
