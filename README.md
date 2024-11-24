@@ -65,9 +65,7 @@ For now, I'm using the pure-Rust implementations of the `ml_kem` crate (specific
 
 Definitely to do:
 
-- Structure: modularize further: split `encryption` and `decryption` into their Kyber and RSA parts; split `keys` into `public` and `secret`; separate `errors` for each module?
-- Check variable names for consistency and expressiveness.
-- Add more tests: of success and failure responses to each operation.
+- Add more tests: of success and failure responses to each operation. Test the various options, including encrypting from and to a file.
 
 Possible further developments include:
 
