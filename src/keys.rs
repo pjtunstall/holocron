@@ -19,6 +19,8 @@ use std::{
     path::Path,
 };
 
+pub const RSA_KEY_BIT_SIZE: usize = 4096;
+
 // ----- Key errors -----
 
 #[derive(Debug)]
@@ -74,7 +76,7 @@ fn generate_kyber_keys() -> (
 }
 
 fn generate_rsa_keys() -> Result<(RsaPrivateKey, RsaPublicKey), Box<dyn Error>> {
-    let secret_key = RsaPrivateKey::new(&mut OsRng, 2048)
+    let secret_key = RsaPrivateKey::new(&mut OsRng, RSA_KEY_BIT_SIZE)
         .map_err(|e| format!("Failed to generate RSA private key:\n{}", e))?;
     let public_key = RsaPublicKey::from(&secret_key);
     Ok((secret_key, public_key))

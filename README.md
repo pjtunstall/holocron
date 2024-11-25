@@ -64,10 +64,10 @@ Given this situation, the first attempts at quantum-proof cryptosystems have com
 
 In total, these are the algorithms I've used:
 
-- Post-quantum asymmetric: formally ML-KEM, aka (CRYSTALS-)Kyber
-- Classical aymmetric: RSA
-- Symmetric key generation: SHA-256
-- Symmetric encryption/decryption: AES-256-GCM
+- Post-quantum asymmetric: formally ML-KEM-1024, aka (CRYSTALS-)[Kyber](https://en.wikipedia.org/wiki/Kyber)-1024
+- Classical asymmetric: [RSA](<https://en.wikipedia.org/wiki/RSA_(cryptosystem)>)-4096
+- Symmetric key generation: [SHA](https://en.wikipedia.org/wiki/Secure_Hash_Algorithms)-256
+- Symmetric encryption/decryption: [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard)-256-[GCM](https://en.wikipedia.org/wiki/Galois/Counter_Mode)
 
 The encrypted message consists of the following items concatenated:
 
@@ -77,13 +77,13 @@ The encrypted message consists of the following items concatenated:
 - RSA nonce
 - Message
 
-For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange, `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
+For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange (with a key size of 512 bytes), `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA-256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
 
 ## Possible further developments
 
 Tests:
 
-- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation. Although the current integration test in `options.rs` verifies that the core system all works, and hence that it's components work, it would be useful to add finer grained tests before making radical changes to any of those components, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
+- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation. Although the current integration test in `options.rs` verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms. Look into ways to test the actual security of the system.
 
 Basic features:
 
@@ -98,9 +98,10 @@ Better key handling:
 
 Better security:
 
-- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
-- Review security of the system: is concatenating the keys enough? Look into how Apple and Signal and Chrome are doing it.
 - Switch to more reliable dependencies for the cryptographic algorithms.
+- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
+- Review security of the system. Look more closely into how Apple, Signal, Chrome, Cloudflare etc. are doing it.
+- Consider Elliptic-Curve Diffie-Hellman for the classical key exchange.
 
 UI:
 

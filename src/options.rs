@@ -4,8 +4,8 @@ use std::{
     path::Path,
 };
 
-use crate::decryption::decrypt;
-use crate::encryption::encrypt;
+use crate::decryption;
+use crate::encryption;
 use crate::keys;
 
 pub fn c_for_clear_all_keys() {
@@ -84,7 +84,7 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         }
     };
 
-    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+    let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
             println!("Encryption failed:\n{}", e);
@@ -159,7 +159,7 @@ pub fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str
         }
     };
 
-    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+    let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
             println!("Encryption failed:\n{}", e);
@@ -209,7 +209,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
         }
     };
 
-    let encrypted = match encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+    let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
             println!("Encryption failed:\n{}", e);
@@ -289,7 +289,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         }
     };
 
-    let decrypted = match decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
+    let decrypted = match decryption::decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
         Ok(message) => message,
         Err(e) => {
             println!("Failed to decrypt the message:\n{}", e);
@@ -374,7 +374,7 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
         }
     };
 
-    let decrypted = match decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
+    let decrypted = match decryption::decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
         Ok(message) => message,
         Err(e) => {
             println!("Failed to decrypt the message:\n{}", e);
@@ -389,9 +389,11 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
 mod tests {
     use super::*;
 
+    // Generate keys and save them, then load and parse public key, then encrypt and decrypt a message with it. Check that the decrypted message is the same as the original.
     #[test]
-    fn generate_keys_and_save_then_encrypt_and_decrypt() {
+    fn test_holocron() {
         let username = "bob";
+
         std::env::set_current_dir(std::env::current_dir().unwrap()).unwrap();
         let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = keys::generate_keys(username).unwrap();
         let public_key_path = format!("keys/{}_public_key.asc", username);
@@ -401,8 +403,8 @@ mod tests {
 
         let alice_plaintext = "We're in a spot of bother.";
 
-        match encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
-            Ok(wire_message) => match decrypt(&wire_message, &kyber_dk, &rsa_dk) {
+        match encryption::encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
+            Ok(wire_message) => match decryption::decrypt(&wire_message, &kyber_dk, &rsa_dk) {
                 Ok(bob_plaintext) => {
                     assert_eq!(
                         alice_plaintext, &bob_plaintext,
@@ -414,5 +416,7 @@ mod tests {
             },
             Err(e) => panic!("{}", e),
         }
+
+        keys::delete_keys_folder().unwrap();
     }
 }

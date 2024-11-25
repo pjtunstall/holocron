@@ -11,7 +11,7 @@ use ml_kem::{
 };
 use rsa::{Pkcs1v15Encrypt, RsaPrivateKey};
 
-use crate::keys::{self, KeyError};
+use crate::keys::{self, KeyError, RSA_KEY_BIT_SIZE};
 
 // ----- Decryption side errors -----
 
@@ -35,7 +35,7 @@ impl std::fmt::Display for DecryptionError {
             DecryptionError::Utf8Error(e) => write!(f, "UTF-8 conversion error:\n{}", e),
             DecryptionError::AesError(e) => write!(f, "Decryption error:\n{}", e),
             DecryptionError::KyberError(e) => write!(f, "Kyber operation failed:\n{}", e),
-            DecryptionError::RsaError(e) => write!(f, "rsa operation failed:\n{}", e),
+            DecryptionError::RsaError(e) => write!(f, "RSA operation failed:\n{}", e),
             DecryptionError::KeyDerivationError(e) => write!(f, "Key derivation failed:\n{}", e),
             DecryptionError::KeyGenerationError(e) => write!(f, "Key generation failed:\n{}", e),
         }
@@ -82,12 +82,14 @@ struct WireMessage {
 }
 
 fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError> {
-    let kyber_key_length: usize = 1568;
+    let kyber_encapsulated_secret_length: usize = 1568;
     let aes_nonce_length: usize = 12;
-    let rsa_key_length: usize = 256;
+    let rsa_encapsulated_secret_length: usize = RSA_KEY_BIT_SIZE / 8;
 
-    let kyber_key_plus_nonce_length: usize = kyber_key_length + aes_nonce_length;
-    let rsa_key_plus_nonce_length: usize = rsa_key_length + aes_nonce_length;
+    let kyber_encapsulated_secret_length_plus_nonce_length: usize =
+        kyber_encapsulated_secret_length + aes_nonce_length;
+    let rsa_encapsulated_secret_length_plus_nonce_length: usize =
+        rsa_encapsulated_secret_length + aes_nonce_length;
 
     let content = if wire_message.contains("-----BEGIN HOLOCRON MESSAGE-----") {
         wire_message
@@ -100,20 +102,27 @@ fn parse_wire_message(wire_message: &str) -> Result<WireMessage, DecryptionError
     };
 
     let bytes = Base64::decode_vec(&content)?;
-    if bytes.len() < 1568 + 24 + 256 {
+    if bytes.len() < 1568 + 24 + rsa_encapsulated_secret_length {
         return Err(DecryptionError::InvalidFormat);
     }
 
-    let kyber_encapsulated_secret = bytes[0..kyber_key_length].to_vec();
-    let kyber_nonce = bytes[kyber_key_length..kyber_key_plus_nonce_length].to_vec();
-
-    let rsa_encapsulated_secret =
-        bytes[kyber_key_plus_nonce_length..kyber_key_plus_nonce_length + rsa_key_length].to_vec();
-    let rsa_nonce = bytes[kyber_key_plus_nonce_length + rsa_key_length
-        ..kyber_key_plus_nonce_length + rsa_key_plus_nonce_length]
+    let kyber_encapsulated_secret = bytes[0..kyber_encapsulated_secret_length].to_vec();
+    let kyber_nonce = bytes
+        [kyber_encapsulated_secret_length..kyber_encapsulated_secret_length_plus_nonce_length]
         .to_vec();
-    let ciphertext =
-        bytes[kyber_key_plus_nonce_length + rsa_key_length + aes_nonce_length..].to_vec();
+
+    let rsa_encapsulated_secret = bytes[kyber_encapsulated_secret_length_plus_nonce_length
+        ..kyber_encapsulated_secret_length_plus_nonce_length + rsa_encapsulated_secret_length]
+        .to_vec();
+    let rsa_nonce = bytes[kyber_encapsulated_secret_length_plus_nonce_length
+        + rsa_encapsulated_secret_length
+        ..kyber_encapsulated_secret_length_plus_nonce_length
+            + rsa_encapsulated_secret_length_plus_nonce_length]
+        .to_vec();
+    let ciphertext = bytes[kyber_encapsulated_secret_length_plus_nonce_length
+        + rsa_encapsulated_secret_length
+        + aes_nonce_length..]
+        .to_vec();
 
     Ok(WireMessage {
         kyber_encapsulated_secret,
