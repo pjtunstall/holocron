@@ -10,7 +10,7 @@ Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise 
 
 [Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
 
-If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh/), [Apple](https://security.apple.com/blog/imessage-pq3/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
+If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
 
 This project is my attempt.
 
@@ -42,7 +42,7 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 
 Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g bob`.
 
-To run the tests, run `cargo test`. Note that the integration test in `options.rs` assumes that keys for `bob` don't already exist in the `keys` folder in the current directory. If you want to run the test, either delete Bob's keys or move them elsewhere till after the test.
+Run `cargo test` to test the code. Note that the integration test in `options.rs` assumes that keys for `bob` don't already exist in the `keys` folder in the current directory. If you want to perform this test, either delete Bob's keys or move them elsewhere till after the test.
 
 ## In detail
 
