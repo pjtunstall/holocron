@@ -1,3 +1,12 @@
+use std::{
+    env,
+    error::Error,
+    fmt,
+    fs::{self, File},
+    io::{self, Read, Write},
+    path::Path,
+};
+
 use base64ct::{Base64, Encoding};
 use hkdf::Hkdf;
 use ml_kem::{
@@ -10,14 +19,6 @@ use rsa::{
     RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
-use std::{
-    env,
-    error::Error,
-    fmt,
-    fs::{self, File},
-    io::{self, Read, Write},
-    path::Path,
-};
 
 pub const RSA_KEY_BIT_SIZE: usize = 4096;
 

@@ -40,9 +40,9 @@ Clone this repository with `git clone https://github.com/pjtunstall/holocron`. T
 
 `./holocron -c` to clear all keys, i.e. delete the `keys` folder in the current directory.
 
-Note that if you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g bob`.
+If you compile in debug mode with `cargo run`, you'll need to prefix any arguments with `--`, thus: `./holocron -- -g bob`.
 
-Run `cargo test` to test the code. Note that the integration test in `options.rs` assumes that keys for `bob` don't already exist in the `keys` folder in the current directory. If you want to perform this test, either delete Bob's keys or move them elsewhere till after the test.
+Run `cargo test` to test the code. Note that the integration test in `tests/integration_test.rs` assumes that keys for `bob` don't already exist in the `keys` folder in the current directory. If you want to perform this test, either delete Bob's keys or move them elsewhere till after the test.
 
 ## In detail
 
@@ -83,7 +83,7 @@ For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml
 
 Tests:
 
-- Add more integration tests to `options.rs` for all the options, or put them in `main.rs`. Add unit tests. Test success and failure responses to each operation. Although the current integration test in `options.rs` verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms. Look into ways to test the actual security of the system.
+- Make integration tests for each of the options to replace the current single integration test (possibly repurposing some bits of the latter as unit tests), then all modules declared in `lib.rs`, except for `options`, can be made private. Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms. Look into ways to test the actual security of the system.
 
 Basic features:
 

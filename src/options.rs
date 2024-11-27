@@ -4,15 +4,13 @@ use std::{
     path::Path,
 };
 
-use crate::decryption;
-use crate::encryption;
-use crate::keys;
+use crate::{decryption, encryption, keys};
 
 pub fn c_for_clear_all_keys() {
     if keys::confirm_deletion() {
         match keys::delete_keys_folder() {
             Ok(_) => println!("Keys folder successfully deleted."),
-            Err(e) => eprintln!("Failed to delete keys folder:\n{}", e),
+            Err(e) => eprintln!("Failed to delete keys folder: {}", e),
         }
     } else {
         println!("Exiting without deleting keys.");
@@ -31,7 +29,7 @@ pub fn g_for_generate_keys(args: &Vec<String>, usage: &str) {
     let username = &args[2];
 
     if let Err(e) = keys::generate_keys(username) {
-        eprintln!("Error: Failed to generate keys for `{}`:\n{}", username, e);
+        eprintln!("Error: Failed to generate keys for `{}`: {}", username, e);
     } else {
         println!("Keys successfully generated for `{}`.", username);
     }
@@ -54,20 +52,20 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
             .join("keys")
             .join(format!("{}_public_key.asc", username)),
         Err(e) => {
-            println!("Failed to get current directory:\n{}", e);
+            println!("Failed to get current directory: {}", e);
             return;
         }
     };
 
     if !file_path.exists() {
-        println!("Public key file not found at:\n{}", file_path.display());
+        println!("Public key file not found at `{}`", file_path.display());
         return;
     }
 
     let plaintext = match fs::read_to_string(plaintext_file) {
         Ok(content) => content,
         Err(e) => {
-            println!("Failed to read plaintext file `{}`:\n{}", plaintext_file, e);
+            println!("Failed to read plaintext file `{}`: {}", plaintext_file, e);
             return;
         }
     };
@@ -76,7 +74,7 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse public key at: `{}`\n{}",
+                "Failed to parse public key at `{}`: {}",
                 file_path.display(),
                 e
             );
@@ -87,7 +85,7 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
     let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
-            println!("Encryption failed:\n{}", e);
+            println!("Encryption failed: {}", e);
             return;
         }
     };
@@ -107,7 +105,7 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         Ok(f) => f,
         Err(e) => {
             println!(
-                "Failed to create ciphertext file `{}`:\n{}",
+                "Failed to create ciphertext file `{}`: {}",
                 ciphertext_file, e
             );
             return;
@@ -116,7 +114,7 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
 
     if let Err(e) = file.write_all(ciphertext.as_bytes()) {
         println!(
-            "Failed to write ciphertext to file `{}`:\n{}",
+            "Failed to write ciphertext to file `{}`: {}",
             ciphertext_file, e
         );
         return;
@@ -142,7 +140,7 @@ pub fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str
             .join("keys")
             .join(format!("{}_public_key.asc", username)),
         Err(e) => {
-            println!("Failed to get current directory:\n{}", e);
+            println!("Failed to get current directory: {}", e);
             return;
         }
     };
@@ -152,7 +150,7 @@ pub fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse public key file at: `{}`\n{}",
+                "Failed to parse public key file at `{}`: {}",
                 key_file_path, e
             );
             return;
@@ -162,7 +160,7 @@ pub fn ett_for_encrypt_from_terminal_to_terminal(args: &Vec<String>, usage: &str
     let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
-            println!("Encryption failed:\n{}", e);
+            println!("Encryption failed: {}", e);
             return;
         }
     };
@@ -192,7 +190,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
             .join("keys")
             .join(format!("{}_public_key.asc", username)),
         Err(e) => {
-            println!("Failed to get current directory:\n{}", e);
+            println!("Failed to get current directory: {}", e);
             return;
         }
     };
@@ -202,7 +200,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse public key file at: `{}`\n{}",
+                "Failed to parse public key file at `{}`: {}",
                 key_file_path, e
             );
             return;
@@ -212,7 +210,7 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
     let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
-            println!("Encryption failed:\n{}", e);
+            println!("Encryption failed: {}", e);
             return;
         }
     };
@@ -226,13 +224,13 @@ pub fn etf_for_encrypt_from_terminal_to_file(args: &Vec<String>, usage: &str) {
     let mut file = match File::create(path) {
         Ok(f) => f,
         Err(e) => {
-            println!("Failed to create ciphertext file:\n{}", e);
+            println!("Failed to create ciphertext file: {}", e);
             return;
         }
     };
 
     if let Err(e) = file.write_all(ciphertext.as_bytes()) {
-        println!("Failed to write ciphertext to file:\n{}", e);
+        println!("Failed to write ciphertext to file: {}", e);
         return;
     }
 
@@ -256,13 +254,13 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
             .join("keys")
             .join(format!("{}_secret_key.asc", username)),
         Err(e) => {
-            println!("Failed to get current directory:\n{}", e);
+            println!("Failed to get current directory: {}", e);
             return;
         }
     };
 
     if !file_path.exists() {
-        println!("Secret key file not found at:\n{}", file_path.display());
+        println!("Secret key file not found at `{}`", file_path.display());
         return;
     }
 
@@ -270,7 +268,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         Ok(content) => content,
         Err(e) => {
             println!(
-                "Failed to read ciphertext file `{}`:\n{}",
+                "Failed to read ciphertext file `{}`: {}",
                 ciphertext_file, e
             );
             return;
@@ -281,7 +279,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse secret key file `{}`:\n{}",
+                "Failed to parse secret key file `{}`: {}",
                 file_path.display(),
                 e
             );
@@ -292,7 +290,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
     let decrypted = match decryption::decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
         Ok(message) => message,
         Err(e) => {
-            println!("Failed to decrypt the message:\n{}", e);
+            println!("Failed to decrypt message: {}", e);
             return;
         }
     };
@@ -306,7 +304,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         Ok(file) => file,
         Err(e) => {
             println!(
-                "Failed to create plaintext file `{}`:\n{}",
+                "Failed to create plaintext file `{}`: {}",
                 decrypted_file, e
             );
             return;
@@ -315,7 +313,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
 
     if let Err(e) = file.write_all(decrypted.as_bytes()) {
         println!(
-            "Failed to write to plaintext file `{}`:\n{}",
+            "Failed to write to plaintext file `{}`: {}",
             decrypted_file, e
         );
         return;
@@ -341,13 +339,13 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
             .join("keys")
             .join(format!("{}_secret_key.asc", username)),
         Err(e) => {
-            println!("Failed to get current directory:\n{}", e);
+            println!("Failed to get current directory: {}", e);
             return;
         }
     };
 
     if !file_path.exists() {
-        println!("Secret key file not found at:\n{}", file_path.display());
+        println!("Secret key file not found at `{}`", file_path.display());
         return;
     }
 
@@ -355,7 +353,7 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
         Ok(content) => content,
         Err(e) => {
             println!(
-                "Failed to read ciphertext file `{}`:\n{}",
+                "Failed to read ciphertext file `{}`: {}",
                 ciphertext_file, e
             );
             return;
@@ -366,7 +364,7 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
         Ok(keys) => keys,
         Err(e) => {
             println!(
-                "Failed to parse secret key file `{}`:\n{}",
+                "Failed to parse secret key file `{}`: {}",
                 file_path.display(),
                 e
             );
@@ -377,88 +375,10 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
     let decrypted = match decryption::decrypt(&ciphertext, &kyber_dk, &rsa_dk) {
         Ok(message) => message,
         Err(e) => {
-            println!("Failed to decrypt the message:\n{}", e);
+            println!("Failed to decrypt the message: {}", e);
             return;
         }
     };
 
     println!("{}", decrypted);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct ConditionalCleanup {
-        cleanup: bool,
-    }
-
-    impl ConditionalCleanup {
-        fn new() -> Self {
-            Self { cleanup: false }
-        }
-
-        fn disarm(&mut self) {
-            self.cleanup = true;
-        }
-    }
-
-    impl Drop for ConditionalCleanup {
-        fn drop(&mut self) {
-            // Delete any keys generated in by the test.
-            if self.cleanup {
-                if let Err(e) = fs::remove_file("keys/bob_public_key.asc") {
-                    eprintln!("Error removing public key: {}", e);
-                }
-                if let Err(e) = fs::remove_file("keys/bob_secret_key.asc") {
-                    eprintln!("Error removing secret key:\n{}", e);
-                }
-
-                // Check if the "keys" directory exists and remove it if it's empty..
-                if let Ok(entries) = fs::read_dir("keys") {
-                    if entries.count() == 0 {
-                        if let Err(e) = fs::remove_dir("keys") {
-                            eprintln!("Error removing `keys` directory:\n{}", e);
-                        }
-                    }
-                } else {
-                    eprintln!("Failed to read `keys` directory.");
-                }
-            }
-        }
-    }
-
-    // Generate keys and save them, then load and parse public key, then encrypt and decrypt a message with it. Check that the decrypted message is the same as the original. Delete any keys generated in by the test.
-    // Note: this test assumed that keys for `bob` don't already exist in the `keys` folder. If they do, you can delete them or more them elsewhere while you run the test.
-    #[test]
-    fn test_holocron() {
-        let username = "bob";
-
-        let mut guard = ConditionalCleanup::new();
-        std::env::set_current_dir(std::env::current_dir().unwrap()).unwrap();
-        let (kyber_ek, kyber_dk, rsa_ek, rsa_dk) = keys::generate_keys(username).unwrap();
-        guard.disarm(); // Only allow keys to be deleted if they were generated by the test.
-
-        let public_key_path = format!("keys/{}_public_key.asc", username);
-        let (loaded_kyber_ek, loaded_rsa_ek) = keys::parse_public_key(&public_key_path).unwrap();
-
-        assert_eq!(kyber_ek, loaded_kyber_ek, "Public key mismatch: Kyber");
-        assert_eq!(rsa_ek, loaded_rsa_ek, "Public key mismatch: RSA");
-
-        let alice_plaintext = "We're in a spot of bother.";
-
-        match encryption::encrypt(alice_plaintext.as_bytes(), &loaded_kyber_ek, &loaded_rsa_ek) {
-            Ok(wire_message) => match decryption::decrypt(&wire_message, &kyber_dk, &rsa_dk) {
-                Ok(bob_plaintext) => {
-                    assert_eq!(
-                        alice_plaintext, &bob_plaintext,
-                        "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                        alice_plaintext, bob_plaintext
-                    );
-                }
-                Err(e) => panic!("{}", e),
-            },
-            Err(e) => panic!("{}", e),
-        }
-    }
 }
