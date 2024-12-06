@@ -14,7 +14,7 @@ If online banking, commerce, etc. are to survive, they'll need new systems. Seve
 
 This project is my attempt.
 
-## Should I trust my life to it?
+## Should I trust my life/feedom/crypto billions to it?
 
 No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve it, but, for now and the foreseeable future, consider it just a learning exercise.
 
