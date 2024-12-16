@@ -58,7 +58,7 @@ Alice then sends the encrypted symmetric key and message to Bob. Bob decrypts th
 
 This is the basic idea. Actual systems may include further subtleties. For example, asymemtric systems such a Diffie-Hellman use a combination of static (i.e. persistent) keys and ephemeral/session keys to ensure [forward secrecy](https://en.wikipedia.org/wiki/Forward_secrecy). That is, to ensure that previous messages can't be read even if the notorious Eve gains access to Bob's static secret key.
 
-Now, symmetric algorithms are thought to be resistant to quantum attack, provided a reasonably large key is used. It's the asymmetric algorithms that are at risk. The current standard, widely-used public-key exchange mechanisms, such as RSA, will be vulnerable when quantum computers reacha certain size. In the last couple of years, a few quantum-proof key-exchange mechanisms have been proposed, but it's early days and it's possible that flaws will be found. Already some supposedly quantum-proof algorithms, have been cracked with classical (non-quantum) techniques.
+Now, symmetric algorithms are thought to be resistant to quantum attack, provided a reasonably large key is used. It's the asymmetric algorithms that are at risk. The current standard, widely-used public-key exchange mechanisms, such as RSA, will be vulnerable when quantum computers reach a certain size. In the last couple of years, a few quantum-proof key-exchange mechanisms have been proposed, but it's early days and it could happen that flaws will be found. Already some supposedly quantum-proof algorithms, have been cracked with classical (non-quantum) techniques.
 
 Given this situation, the first attempts at quantum-proof cryptosystems have combined well-established classical algorithms with the new, hopefully post-quantum algorithms, to ensure that they're no less secure than current systems. I've followed this pattern too. My system uses RSA for the classical part of the key exchange and ML-KEM, also known as Kyber, for the post-quantum part.
 
@@ -77,14 +77,15 @@ The encrypted message consists of the following items concatenated:
 - RSA nonce
 - Message
 
-For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange (with a key size of 512 bytes), `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA-256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in its [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning).
+For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange (with a key size of 512 bytes), `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA-256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in the [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning) for RustCrypto's implementation.
 
 ## Possible further developments
 
 Tests:
 
 - Make integration tests for each of the options to replace the current single integration test (and maybe repurpose some bits of the latter as unit tests), then all modules declared in `lib.rs`, except for `options`, can be made private.
-- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms. Look into ways to test the actual security of the system.
+- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
+- Look into ways to test the actual security of the system.
 
 Basic features:
 
