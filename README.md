@@ -1,5 +1,18 @@
 # Holocron
 
+- [What is this?](#what-is-this)
+- [What's it for?](#whats-it-for)
+- [Should I trust my life/freedom/well-hodled bitcoins to it?](#should-i-trust-my-lifefreedomwell-hodled-bitcoins-to-it)
+- [Usage](#usage)
+- [In detail](#in-detail)
+- [Possible further developments](#possible-further-developments)
+  - [Basic features](#basic-features)
+  - [Better key-handling](#better-key-handling)
+  - [Better security](#better-security)
+  - [UI](#ui)
+  - [Messaging](#messaging)
+  - [Tests](#tests)
+
 ## What is this?
 
 A command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. In this way, in principle, messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer.
@@ -14,7 +27,7 @@ If online banking, commerce, etc. are to survive, they'll need new systems. Seve
 
 This project is my attempt.
 
-## Should I trust my life/feedom/crypto billions to it?
+## Should I trust my life/feedom/well-hodled bitcoins to it?
 
 No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve it, but, for now and the foreseeable future, consider it just a learning exercise.
 
@@ -81,34 +94,34 @@ For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml
 
 ## Possible further developments
 
-Tests:
-
-- Make integration tests for each of the options to replace the current single integration test (and maybe repurpose some bits of the latter as unit tests), then all modules declared in `lib.rs`, except for `options`, can be made private.
-- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
-- Look into ways to test the actual security of the system.
-
-Basic features:
+### Basic features
 
 - Add option to sign and verify messages.
 
-Better key handling:
+### Better key-handling
 
 - Switch to SQLite storage: one table for public keys and one for private.
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
 - Encrypt database.
 
-Better security:
+### Better security
 
 - Switch to more reliable dependencies for the cryptographic algorithms.
 - Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
 - Review security of the system. Look more closely into how Apple, Signal, Chrome, Cloudflare etc. are doing it.
 - Consider Elliptic-Curve Diffie-Hellman for the classical key exchange.
 
-UI:
+### UI
 
 - Rustle up some proper UI to replace the terminal interface.
 
-Messaging:
+### Messaging
 
 - Build a messaging system on top of it.
+
+### Tests
+
+- Make integration tests for each of the options to replace the current single integration test (and maybe repurpose some bits of the latter as unit tests), then all modules declared in `lib.rs`, except for `options`, can be made private.
+- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
+- Look into ways to test the actual security of the system.
