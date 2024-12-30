@@ -21,7 +21,7 @@ A command-line interface for encrypting and decrypting messages with a hybrid cr
 
 Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise awareness.
 
-[Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed to prying eyes.
+[Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed.
 
 If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
 
@@ -29,7 +29,7 @@ This project is my attempt.
 
 ## Should I trust my life/feedom/well-hodled bitcoins to it?
 
-No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve it, but, for now and the foreseeable future, consider it just a learning exercise.
+No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve this project, but, for now and the foreseeable future, consider it just a learning exercise.
 
 ## Usage
 
