@@ -14,6 +14,7 @@ use ml_kem::{
     Encoded, EncodedSizeUser, KemCore, MlKem1024, MlKem1024Params,
 };
 use rand::rngs::OsRng;
+use rand_core::RngCore;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     RsaPrivateKey, RsaPublicKey,
@@ -319,6 +320,8 @@ pub fn delete_keys_folder() -> Result<(), io::Error> {
 }
 
 pub fn derive_aes_key(shared_secret: &[u8]) -> Result<Vec<u8>, KeyError> {
+    let mut salt = [0u8; 32];
+    OsRng.fill_bytes(&mut salt);
     let hk = Hkdf::<Sha256>::new(None, shared_secret);
     let mut okm = [0u8; 32];
     hk.expand(b"aes256gcm key", &mut okm)
