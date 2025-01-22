@@ -123,5 +123,5 @@ For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml
 ### Tests
 
 - Make integration tests for each of the options to replace the current single integration test (and maybe repurpose some bits of the latter as unit tests), then all modules declared in `lib.rs`, except for `options`, can be made private.
-- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that it's components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
+- Add unit tests. Test success and failure responses to each operation. Although the current integration test verifies that the core system successfully encrypts and decrypts, and hence that its components work, it could be useful to add finer grained tests before making radical changes to any of those parts, such as replacing dependencies with other implementations of the cryptographic algorithms, or indeed switching to other algorithms.
 - Look into ways to test the actual security of the system.
