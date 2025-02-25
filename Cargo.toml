@@ -1,7 +1,7 @@
 [package]
 name = "holocron"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [profile.dev.package.num-bigint-dig]
 opt-level = 3
