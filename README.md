@@ -15,9 +15,11 @@
 
 ## What is this?
 
-Consider this a student coding exercise rather than a secure cryoptosystem. It's a command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. The pupose of such a combination is that messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer. However ...
+Consider this a student coding exercise rather than a secure cryoptosystem.
 
-WARNING: While RSA is, in principle secure, RustCrypto's implementation, on which this project depends has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key." RustCrypto report that work is underway to resolve this and that it's only an issue in settings where attackers are able to observe timing information: "local use on a non-compromised computer is fine."[^1]
+It's a command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. The pupose of such a combination is that messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer. However ...
+
+WARNING: ... while RSA is, in principle secure, RustCrypto's implementation, on which this project depends has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key." RustCrypto report that work is underway to resolve this and that it's only an issue in settings where attackers are able to observe timing information: "local use on a non-compromised computer is fine."[^1]
 
 ## Background
 
