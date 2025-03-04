@@ -15,23 +15,17 @@
 
 ## What is this?
 
-A command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. In this way, in principle, messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer.
+Consider this a student coding exercise rather than a secure cryoptosystem. It's a command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a conventional key-exchange mechanism with one of the proposed, experimental post-quantum algorithms. The pupose of such a combination is that messages should be at least as safe as they are with current, well-established methods, and hopefully also secure against even a powerful quantum computer. However ...
 
-## What's it for?
+WARNING: While RSA is, in principle secure, RustCrypto's implementation, on which this project depends, not only describes itself as under construction and not yet independently audited, but has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key."
 
-Fun. An exercise to help me learn Rust. Maybe also, in some small way, to raise awareness.
+## Background
 
-[Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be big enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed.
+[Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be powerful enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed.
 
-If online banking, commerce, etc. are to survive, they'll need new systems. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), [Firefox](https://www.mozilla.org/en-US/firefox/135.0/releasenotes/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
-
-This project is my attempt.
+If online banking, commerce, etc. are to survive, they'll need new methods of encryption. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At present (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), [Firefox](https://www.mozilla.org/en-US/firefox/135.0/releasenotes/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
 
 UPDATE: See [here](https://blog.cloudflare.com/pq-2024/) for a detailed summary of the state of affairs in March 2024, and [here](https://www.netmeister.org/blog/pqc-2025-02.html) for a shorter summary from February 2025. To test whether your browser supports post-quantum encryption, check [here](https://pq.cloudflareresearch.com/) or [here](https://isitquantumsafe.info/).[^1]
-
-## Should I trust my life/feedom/well-hodled bitcoins to it?
-
-No! Don't expect this to be a secure cryptosystem. I'm an amateur in these matters. Look elsewhere for something you can rely on. Even some dependencies that implement the core algorithms have not yet been independently audited. One, the `rsa` crate (which actually handles the classical key exchange), describes itself as under construction and has open security issues. As I learn more, I hope to improve this project, but, for now and the foreseeable future, consider it just a learning exercise.
 
 ## Usage
 
@@ -75,7 +69,7 @@ This is the basic idea. Actual systems may include further subtleties. For examp
 
 Now, symmetric algorithms are thought to be resistant to quantum attack, provided a reasonably large key is used. It's the asymmetric algorithms that are at risk. The current standard, widely-used public-key exchange mechanisms, such as RSA, will be vulnerable when quantum computers reach a certain size. In the last couple of years, a few quantum-proof key-exchange mechanisms have been proposed, but it's early days and it could happen that flaws will be found. Already some supposedly quantum-proof algorithms, have been cracked with classical (non-quantum) techniques.
 
-Given this situation, the first attempts at quantum-proof cryptosystems have combined well-established classical algorithms with the new, hopefully post-quantum algorithms, to ensure that they're no less secure than current systems. I've followed this pattern too. My system uses RSA for the classical part of the key exchange and ML-KEM, also known as Kyber, for the post-quantum part.
+Given this situation, the first attempts at quantum-proof cryptosystems have combined well-established classical algorithms with the new, hopefully post-quantum algorithms, to ensure that they're no less secure than current systems. I've followed this pattern too. I've used RSA for the classical part of the key exchange and ML-KEM, also known as Kyber, for the post-quantum part.
 
 In total, these are the algorithms I've used:
 
@@ -92,7 +86,7 @@ The encrypted message consists of the following items concatenated:
 - RSA nonce
 - Message
 
-For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange (with a key size of 512 bytes), `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA-256) as a hash function for generating the symmetric key. RustCrypto state that `ml_kem` has not yet been independently audited. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA, given the security issues mentioned in the [README](https://github.com/RustCrypto/RSA?tab=readme-ov-file#%EF%B8%8Fsecurity-warning) for RustCrypto's implementation; or, even better, switch to an elliptic curve algorithm, given the many [ways to use RSA insecurely](https://paragonie.com/blog/2018/04/protecting-rsa-based-protocols-against-adaptive-chosen-ciphertext-attacks).
+For now, I'm using the pure-Rust implementations of the RustCrypto library's `ml_kem` crate (specifically ML-KEM-1024) for the post-quantum key exchange and their `rsa` crate for the classical key exchange (with a key size of 512 bytes), `aes-gcm` (specifically AES-256-GCM) for symmetric encryption, and `sha2` (specifically SHA-256) as a hash function for generating the symmetric key. At some point, I may switch to using the reference implementation of ML-KEM, which is written in C, or the `liboqs` version (also in C), based on that, and likewise look for a safer implementation of RSA; or, even better, switch to an elliptic curve algorithm, given the many [ways to use RSA insecurely](https://paragonie.com/blog/2018/04/protecting-rsa-based-protocols-against-adaptive-chosen-ciphertext-attacks).
 
 ## Possible further developments
 
