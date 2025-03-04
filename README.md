@@ -1,8 +1,7 @@
 # Holocron
 
 - [What is this?](#what-is-this)
-- [What's it for?](#whats-it-for)
-- [Should I trust my life/freedom/well-hodled bitcoins to it?](#should-i-trust-my-lifefreedomwell-hodled-bitcoins-to-it)
+- [Background](#background)
 - [Usage](#usage)
 - [In detail](#in-detail)
 - [Possible further developments](#possible-further-developments)
