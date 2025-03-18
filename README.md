@@ -95,7 +95,7 @@ Similarly, I may look for a safer implementation of RSA. Besides the issue menti
 
 ### Better security
 
-- Ensure I'm using a version of MLKEM that's confirmed to be secure against KyberSlash Attack, e.g. [rustpq](https://kyberslash.cr.yp.to/libraries.html).
+- Ensure I'm using a version of MLKEM that's confirmed to be secure against KyberSlash Attack, e.g. [rustpq](https://kyberslash.cr.yp.to/libraries.html). RustCrypto's implementation may be. I'm not qualified to say.
 - Ensure I'm using an implementation of RSA that's not vulnerable to the Marvin Attack, or better ...
 - ... switch to Elliptic-Curve Diffie-Hellman for the classical key exchange.
 - Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
