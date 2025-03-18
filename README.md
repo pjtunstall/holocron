@@ -93,6 +93,14 @@ Similarly, I may look for a safer implementation of RSA. Besides the issue menti
 
 ## Possible further developments
 
+### Better security
+
+- Ensure I'm using a version of MLKEM that's confirmed to be secure against KyberSlash Attack, e.g. [rustpq](https://kyberslash.cr.yp.to/libraries.html).
+- Ensure I'm using an implementation of RSA that's not vulnerable to the Marvin Attack, or better ...
+- ... switch to Elliptic-Curve Diffie-Hellman for the classical key exchange.
+- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
+- Review security of the system. Look more closely into how Apple, Signal, Chrome, Cloudflare etc. are doing it.
+
 ### Basic features
 
 - Add option to sign and verify messages.
@@ -103,13 +111,6 @@ Similarly, I may look for a safer implementation of RSA. Besides the issue menti
 - Allow keys to be imported and deleted.
 - Switch to accept `stdin` inputs.
 - Encrypt database.
-
-### Better security
-
-- Switch to more reliable dependencies for the cryptographic algorithms.
-- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
-- Review security of the system. Look more closely into how Apple, Signal, Chrome, Cloudflare etc. are doing it.
-- Consider Elliptic-Curve Diffie-Hellman for the classical key exchange.
 
 ### UI
 
