@@ -10,7 +10,7 @@
   - [Better security](#better-security)
   - [UI](#ui)
   - [Messaging](#messaging)
-  - [Tests](#tests)
+  - [Tests](#tests)https://github.com/pjtunstall/holocron
 
 ## What is this?
 
@@ -24,9 +24,7 @@ WARNING: It's not yet clear to me whether RustCrypto's implementation of the MLK
 
 [Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be powerful enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed.
 
-If online banking, commerce, etc. are to survive, they'll need new methods of encryption. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At the time of writing (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), [Firefox](https://www.mozilla.org/en-US/firefox/135.0/releasenotes/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.
-
-UPDATES: As of February 2025, Chrome and Firefox both use the hybrid algorithm X25519MLKEM768, but in Chrome it needs to be explicitly enabled with two flags, `chrome://flags/#enable-tls13-kyber` and `chrome://flags/#use-ml-kem`. In Firefox, enter `about:config` into the search bar, then select `security.tls.enable_kyber` and `network.http.http3.enable_kyber`; you can use Bas Westerbaan's [PQSpy](https://addons.mozilla.org/en-GB/firefox/addon/pqspy/) add-on to verify that post-quantum encryption is enabled. The [rustls crate added post-quantum cryptography from version 0.23.22](https://github.com/rustls/rustls/tree/main/rustls-post-quantum), but not by default. To enable it, use the `prefer post-quantum` cargo feature. From Go 1.24, released 11th Febrary 2025, Go's standard library, via the [crypto/tls](https://pkg.go.dev/crypto/tls) package, includes the X25519MLKEM768 hybrid post-quantum key exchange for TLS by default. See [here](https://blog.cloudflare.com/pq-2024/) for a detailed summary of the state of affairs in March 2024, and [here](https://www.netmeister.org/blog/pqc-2025-02.html) for a shorter summary from February 2025. To test whether your browser supports post-quantum encryption, check [here](https://pq.cloudflareresearch.com/) or [here](https://isitquantumsafe.info/).[^2]
+If online banking, commerce, etc. are to survive, they'll need new methods of encryption. Several have been proposed. Some have proved ineffective even against classical computers, but a few possibilities remain. At the time of writing (late 2024), these potentially quantum-proof algorithms are not widely used, but it's likely that, in the near future, hybrid systems will become common. [Signal](https://signal.org/docs/specifications/pqxdh), [Apple](https://security.apple.com/blog/imessage-pq3/), [Cloudflare](https://blog.cloudflare.com/post-quantum-to-origins), [AWS](https://www.amazon.science/blog/preparing-today-for-a-post-quantum-cryptographic-future), [Firefox](https://www.mozilla.org/en-US/firefox/135.0/releasenotes/), and the latest [Chrome](https://blog.chromium.org/2024/05/advancing-our-amazing-bet-on-asymmetric.html) desktop versions have all recently implemented systems that combine well-establish classical algorithms with a hopefully quantum-proof component.[^2]
 
 ## Usage
 
@@ -127,3 +125,7 @@ Similarly, I may look for a safer implementation of RSA. Besides the issue menti
 - Look into ways to test the actual security of the system.
 
 [^1]: [Marvin Attack: potential key recovery through timing sidechannels #1](https://github.com/pjtunstall/holocron/security/dependabot/1)
+
+<!-- keep blank line -->
+
+[^2]: UPDATE: As of February 2025, Chrome and Firefox both use the hybrid algorithm X25519MLKEM768, but in Chrome it needs to be explicitly enabled with two flags, `chrome://flags/#enable-tls13-kyber` and `chrome://flags/#use-ml-kem`. In Firefox, enter `about:config` into the search bar, then select `security.tls.enable_kyber` and `network.http.http3.enable_kyber`; you can use Bas Westerbaan's [PQSpy](https://addons.mozilla.org/en-GB/firefox/addon/pqspy/) add-on to verify that post-quantum encryption is enabled. The [rustls crate added post-quantum cryptography from version 0.23.22](https://github.com/rustls/rustls/tree/main/rustls-post-quantum), but not by default. To enable it, use the `prefer post-quantum` cargo feature. From Go 1.24, released 11th Febrary 2025, Go's standard library, via the [crypto/tls](https://pkg.go.dev/crypto/tls) package, includes the X25519MLKEM768 hybrid post-quantum key exchange for TLS by default. See [here](https://blog.cloudflare.com/pq-2024/) for a detailed summary of the state of affairs in March 2024, and [here](https://www.netmeister.org/blog/pqc-2025-02.html) for a shorter summary from February 2025. To test whether your browser supports post-quantum encryption, check [here](https://pq.cloudflareresearch.com/) or [here](https://isitquantumsafe.info/).
