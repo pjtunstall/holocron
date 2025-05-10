@@ -18,7 +18,7 @@ It's a command-line interface for encrypting and decrypting messages with a hybr
 
 WARNING: ... while RSA is, in principle secure, RustCrypto's implementation, on which this project depends has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key." RustCrypto report that work is underway to resolve this and that it's only an issue in settings where attackers are able to observe timing information: "local use on a non-compromised computer is fine."[^1]
 
-WARNING: It's not yet clear to me whether RustCrypto's implementation of the MLKEM (Kyber) family of algorithms, including the one I used, are vulnerable to the [KyberSlash](https://kyberslash.cr.yp.to/) attack uncovered by Cryspen. On March 18th 2025, I don't see it listed [here](https://kyberslash.cr.yp.to/libraries.html), neither among affected nor unaffected implementations.
+WARNING: It's not yet clear to me whether RustCrypto's implementation of the MLKEM (Kyber) family of algorithms, including the one I used, are vulnerable to the [KyberSlash](https://kyberslash.cr.yp.to/) attack uncovered by Cryspen. On March 18th 2025, I don't see it listed [here](https://kyberslash.cr.yp.to/libraries.html), neither among affected nor unaffected implementations. An alternative option, [pqcrypto](https://github.com/rustpq/pqcrypto), part of the [PQClean](https://github.com/pqclean/pqclean/) project, was patched [25 January 2024](https://github.com/rustpq/pqcrypto/commit/f921490a48508d88d88bf7b7b18f10878e98fdf1); it consists of Rust bindings for C implementations of post-quantum algorithms. If I were redoing this project, or starting another that needed this algorithm, I might choose [Cryspen's own fixed implementation](https://cryspen.com/post/ml-kem-implementation/).
 
 ## Background
 
@@ -93,7 +93,7 @@ Similarly, I may look for a safer implementation of RSA. Besides the issue menti
 
 ### Better security
 
-- Ensure I'm using a version of MLKEM that's confirmed to be secure against KyberSlash Attack, e.g. [rustpq](https://kyberslash.cr.yp.to/libraries.html). RustCrypto's implementation may be. I'm not qualified to say.
+- Ensure I'm using a version of MLKEM that's confirmed to be secure against KyberSlash Attack, e.g. [Cryspen's](https://cryspen.com/post/ml-kem-implementation/) or [rustpq](https://kyberslash.cr.yp.to/libraries.html). RustCrypto's implementation may be. I'm not qualified to say.
 - Ensure I'm using an implementation of RSA that's not vulnerable to the Marvin Attack, or better ...
 - ... switch to Elliptic-Curve Diffie-Hellman for the classical key exchange.
 - Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
