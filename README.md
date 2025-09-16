@@ -2,6 +2,8 @@
 
 - [What is this?](#what-is-this)
 - [Vulnerabilities and Patches](#vulnerabilities-and-patches)
+  - [Marvin Attack](#marvin-attack)
+  - [KyberSlash](#kyberslash)
 - [Background](#background)
 - [Usage](#usage)
 - [In detail](#in-detail)
@@ -15,13 +17,17 @@
 
 ## What is this?
 
-Holocron is a command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a well-established, classical key-exchange mechanism with one of the proposed, post-quantum algorithms. The aim of such a combination is that messages should be at least as safe as they are with current, battle-tested methods, and theoretically also secure against even a powerful quantum computer. For both, I've used the RustCrypto library. 
+Holocron is a command-line interface for encrypting and decrypting messages with a hybrid cryptosystem, combining a well-established, classical key-exchange mechanism with one of the proposed, post-quantum algorithms. The aim of such a combination is that messages should be at least as safe as they are with current, battle-tested methods, and theoretically also secure against even a powerful quantum computer. For both, I've used the RustCrypto library.
+
+It should be emphasized that this is student programming exercise, done for the sake of learning, and not a production-grade, audited cryptosystem.
 
 ## Vulnerabilities and Patches
 
-First, it should be emphasized that this is student programming exercise, done for the sake of learning, and not a production-grade, audited cryptosystem. Look elsewhere for the latter.
+### Marvin Attack
 
-WARNING: While RSA is, in principle secure, RustCrypto's implementation, on which this project depends has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key." RustCrypto report that work is underway to resolve this and that it's only an issue in settings where attackers are able to observe timing information: "local use on a non-compromised computer is fine."[^1]
+While RSA is, in principle secure, RustCrypto's implementation, on which this project depends has been [found vulnerable](https://github.com/RustCrypto/RSA/issues/19#issuecomment-1822995643) to the [Marvin Attack](https://people.redhat.com/~hkario/marvin/), a side-channel attack "that allows performing RSA decryption and signing operations as an attacker with the ability to observe only the time of the decryption operation performed with the private key." RustCrypto report that work is underway to resolve this and that it's only an issue in settings where attackers are able to observe timing information: "local use on a non-compromised computer is fine."[^1]
+
+### KyberSlash
 
 On the other hand, RustCrypto's implementation of ML-KEM was patched on [4 June 2024](https://github.com/RustCrypto/KEMs/commit/3a0545caa234a50cc0ea30ee42325d576d34b64d) against the [KyberSlash](https://kyberslash.cr.yp.to/) attack uncovered by Cryspen.[^2]
 
