@@ -15,6 +15,6 @@ hybrid-array = "0.2.1"
 ml-kem = { version = "0.2.1", features = ["zeroize"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 rand_core = "0.6.4"
-rsa = "0.9.6"
+rsa = "0.9.10"
 sha2 = "0.10.8"
 typenum = "1.17.0"
