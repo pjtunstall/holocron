@@ -31,10 +31,6 @@ While RSA is, in principle secure, RustCrypto's implementation, on which this pr
 
 On the other hand, RustCrypto's implementation of ML-KEM was patched on [4 June 2024](https://github.com/RustCrypto/KEMs/commit/3a0545caa234a50cc0ea30ee42325d576d34b64d) against the [KyberSlash](https://kyberslash.cr.yp.to/) attack uncovered by Cryspen.[^2]
 
-### rand
-
-The version of the `rand` crate that I used (0.8.5) have been found to be unsound when the `log` and `thread_rng` features are enabled. `rand` 0.8.5 is also used transitively via `num-bigint-dig`. Neither `holocron` nor `num-bigint-dig` enable these features. Ideally, I'd update my dependencies, but that will take some refactoring.
-
 ## Background
 
 [Quantum computers](https://en.wikipedia.org/wiki/Quantum_computing) are a reality. Whether it takes 5 years or 30, eventually they'll be powerful enough to render current public-key cryptosystems ineffective. This is not just a concern for the future: data collected today may then be exposed.
