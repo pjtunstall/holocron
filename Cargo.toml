@@ -19,3 +19,6 @@ rsa = "0.9.10"
 sha2 = "0.10.8"
 typenum = "1.17.0"
 zeroize = "1.9.0"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.189"

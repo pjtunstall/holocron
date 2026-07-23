@@ -110,7 +110,7 @@ Similarly, I may look for a safer implementation of RSA, given the current vulne
 - Plaintext passed through -ett/-etf still exists in OS argv, ps, shell history, and possibly audit logs. Use stdin or file-only input to resolve this.
 - Terminal plaintext remains in terminal scrollback.
 - Memory is not locked, so secrets may reach swap or hibernation storage.
-- Core dumps are not disabled; crashes bypass normal Drop cleanup.
+- Core dumps are not disabled for Windows; crashes bypass normal Drop cleanup. Core dumps are disabled on Unix via setrlimit(RLIMIT_CORE, 0), with extra Linux hardening via prctl(PR_SET_DUMPABLE, 0). Windows crash dumps are not disabled; crashes still bypass normal Drop cleanup.
 - Crypto dependencies may create internal temporary copies the application can't zeroize.
 - Key deletion only unlinks files; it does not securely overwrite them.
 - Zeroization still can't guarantee removal after abrupt termination or prevent OS/kernel copies.

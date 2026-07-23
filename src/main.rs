@@ -4,6 +4,10 @@ use holocron::options;
 use zeroize::Zeroizing;
 
 fn main() {
+    // Some measures to reduce the chance of secrets being leaked in core dumps.
+    // Unix-like only. Not a complete solution!
+    disable_core_dumps();
+
     if env::args().len() < 2 {
         println!("\nInsufficient arguments.\n{}", USAGE);
         return;
@@ -19,6 +23,31 @@ fn main() {
         "-dff" => options::dff_for_decrypt_from_file_to_file(&args, &USAGE),
         "-dft" => options::dft_for_decrypt_from_file_to_terminal(&args, &USAGE),
         _ => println!("Command not found.\n{}", USAGE),
+    }
+}
+
+fn disable_core_dumps() {
+    #[cfg(unix)]
+    {
+        use libc::{RLIMIT_CORE, rlimit, setrlimit};
+
+        let lim = rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        // Best-effort: ignore failure rather than aborting before crypto work.
+        unsafe {
+            let _ = setrlimit(RLIMIT_CORE, &lim);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use libc::{PR_SET_DUMPABLE, prctl};
+
+        unsafe {
+            let _ = prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+        }
     }
 }
 
