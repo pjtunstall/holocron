@@ -1,6 +1,7 @@
 use std::env;
 
 use holocron::options;
+use zeroize::Zeroizing;
 
 fn main() {
     if env::args().len() < 2 {
@@ -8,7 +9,7 @@ fn main() {
         return;
     }
 
-    let args: Vec<String> = env::args().collect();
+    let args = Zeroizing::new(env::args().collect::<Vec<String>>());
     match args[1].as_str() {
         "-c" => options::c_for_clear_all_keys(),
         "-g" => options::g_for_generate_keys(&args, &USAGE),

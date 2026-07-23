@@ -1,8 +1,7 @@
 use std::fs;
 
-use base64ct::{Base64, Encoding};
-use rand::rngs::OsRng;
 use rand::RngCore;
+use rand::rngs::OsRng;
 
 use holocron::{decryption, encryption, keys};
 
@@ -54,7 +53,7 @@ fn test_holocron() {
     // Create a long random name to avoid clash with user-generated keys.
     let mut buffer = vec![0u8; 16];
     OsRng.fill_bytes(&mut buffer);
-    let username = Base64::encode_string(&buffer);
+    let username = buffer.iter().map(|byte| format!("{byte:02x}")).collect();
 
     let mut cleanup = ConditionalCleanup::new(username);
     std::env::set_current_dir(std::env::current_dir().unwrap()).unwrap();
@@ -73,9 +72,9 @@ fn test_holocron() {
         Ok(wire_message) => match decryption::decrypt(&wire_message, &kyber_dk, &rsa_dk) {
             Ok(bob_plaintext) => {
                 assert_eq!(
-                    alice_plaintext, &bob_plaintext,
-                    "Message mismatch.\nAlice: `{}`\nBob: `{}`",
-                    alice_plaintext, bob_plaintext
+                    alice_plaintext.as_bytes(),
+                    bob_plaintext.as_slice(),
+                    "Message mismatch"
                 );
             }
             Err(e) => panic!("{}", e),

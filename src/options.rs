@@ -1,8 +1,10 @@
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{self, Write},
     path::Path,
 };
+
+use zeroize::Zeroizing;
 
 use crate::{decryption, encryption, keys};
 
@@ -62,8 +64,8 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         return;
     }
 
-    let plaintext = match fs::read_to_string(plaintext_file) {
-        Ok(content) => content,
+    let plaintext = match fs::read(plaintext_file) {
+        Ok(content) => Zeroizing::new(content),
         Err(e) => {
             println!("Failed to read plaintext file `{}`: {}", plaintext_file, e);
             return;
@@ -82,13 +84,14 @@ pub fn eff_for_encrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         }
     };
 
-    let encrypted = match encryption::encrypt(plaintext.as_bytes(), &kyber_ek, &rsa_ek) {
+    let encrypted = match encryption::encrypt(plaintext.as_ref(), &kyber_ek, &rsa_ek) {
         Ok(enc) => enc,
         Err(e) => {
             println!("Encryption failed: {}", e);
             return;
         }
     };
+    drop(plaintext);
 
     let file_name = Path::new(plaintext_file)
         .file_stem()
@@ -311,7 +314,7 @@ pub fn dff_for_decrypt_from_file_to_file(args: &Vec<String>, usage: &str) {
         }
     };
 
-    if let Err(e) = file.write_all(decrypted.as_bytes()) {
+    if let Err(e) = file.write_all(decrypted.as_ref()) {
         println!(
             "Failed to write to plaintext file `{}`: {}",
             decrypted_file, e
@@ -380,5 +383,11 @@ pub fn dft_for_decrypt_from_file_to_terminal(args: &Vec<String>, usage: &str) {
         }
     };
 
-    println!("{}", decrypted);
+    let mut stdout = io::stdout().lock();
+    if let Err(e) = stdout
+        .write_all(decrypted.as_ref())
+        .and_then(|_| stdout.write_all(b"\n"))
+    {
+        eprintln!("Failed to write plaintext to terminal: {}", e);
+    }
 }

@@ -106,8 +106,14 @@ Similarly, I may look for a safer implementation of RSA, given the current vulne
 
 - Ensure I'm using an implementation of RSA that's not vulnerable to the Marvin Attack, or better ...
 - ... switch to Elliptic-Curve Diffie-Hellman for the classical key exchange.
-- Check anywhere the stack needs to be explicitly cleaned with `zeroize`, including especially bytes from private keys. Some dependencies use `zeroize` when certain types are dropped, but I need to make sure I'm cleaning up anything else that requires it.
 - Review security of the system. Look more closely into how Apple, Signal, Chrome, Cloudflare etc. are doing it.
+- Plaintext passed through -ett/-etf still exists in OS argv, ps, shell history, and possibly audit logs. Use stdin or file-only input to resolve this.
+- Terminal plaintext remains in terminal scrollback.
+- Memory is not locked, so secrets may reach swap or hibernation storage.
+- Core dumps are not disabled; crashes bypass normal Drop cleanup.
+- Crypto dependencies may create internal temporary copies the application can't zeroize.
+- Key deletion only unlinks files; it does not securely overwrite them.
+- Zeroization still can't guarantee removal after abrupt termination or prevent OS/kernel copies.
 
 ### Basic features
 

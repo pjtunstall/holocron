@@ -5,11 +5,12 @@ use aes_gcm::{
 use base64ct::{Base64, Encoding};
 use generic_array::GenericArray;
 use ml_kem::{
-    kem::{Encapsulate, EncapsulationKey},
     MlKem1024Params,
+    kem::{Encapsulate, EncapsulationKey},
 };
 use rand_core::{OsRng, RngCore};
 use rsa::{Pkcs1v15Encrypt, RsaPublicKey};
+use zeroize::Zeroizing;
 
 use crate::keys::{self, KeyError};
 
@@ -51,21 +52,23 @@ impl From<KeyError> for EncryptionError {
 
 fn kyber_encapsulate_key(
     kyber_ek: &EncapsulationKey<MlKem1024Params>,
-) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
+) -> Result<(Vec<u8>, Zeroizing<Vec<u8>>), EncryptionError> {
     kyber_ek
         .encapsulate(&mut OsRng)
-        .map(|(secret, shared)| (secret.to_vec(), shared.to_vec()))
+        .map(|(secret, shared)| (secret.to_vec(), Zeroizing::new(shared.to_vec())))
         .map_err(|e| EncryptionError::KyberError(format!("{:?}", e)))
 }
 
-fn rsa_encapsulate_key(rsa_ek: &RsaPublicKey) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
-    let mut aes_key: [u8; 32] = [0u8; 32];
+fn rsa_encapsulate_key(
+    rsa_ek: &RsaPublicKey,
+) -> Result<(Vec<u8>, Zeroizing<[u8; 32]>), EncryptionError> {
+    let mut aes_key = Zeroizing::new([0u8; 32]);
     let mut rng = OsRng;
-    rng.fill_bytes(&mut aes_key);
+    rng.fill_bytes(aes_key.as_mut());
     let encrypted_aes_key = rsa_ek
-        .encrypt(&mut rng, Pkcs1v15Encrypt, &aes_key)
+        .encrypt(&mut rng, Pkcs1v15Encrypt, aes_key.as_ref())
         .map_err(|e| EncryptionError::RsaError(e.to_string()))?;
-    Ok((encrypted_aes_key, aes_key.to_vec()))
+    Ok((encrypted_aes_key, aes_key))
 }
 
 fn aes_encrypt(key: &[u8], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
@@ -106,12 +109,17 @@ pub fn encrypt(
     rsa_ek: &RsaPublicKey,
 ) -> Result<String, EncryptionError> {
     let (kyber_encapsulated_secret, kyber_shared_secret) = kyber_encapsulate_key(kyber_ek)?;
-    let kyber_aes_encryption_key = keys::derive_aes_key(&kyber_shared_secret)?;
-    let (kyber_nonce, kyber_ciphertext) = aes_encrypt(&kyber_aes_encryption_key, plaintext)?;
+    let kyber_aes_encryption_key = keys::derive_aes_key(kyber_shared_secret.as_ref())?;
+    drop(kyber_shared_secret);
+    let (kyber_nonce, kyber_ciphertext) =
+        aes_encrypt(kyber_aes_encryption_key.as_ref(), plaintext)?;
+    drop(kyber_aes_encryption_key);
 
     let (rsa_encapsulated_secret, rsa_shared_secret) = rsa_encapsulate_key(rsa_ek)?;
-    let rsa_aes_encryption_key = keys::derive_aes_key(&rsa_shared_secret)?;
-    let (rsa_nonce, ciphertext) = aes_encrypt(&rsa_aes_encryption_key, &kyber_ciphertext)?;
+    let rsa_aes_encryption_key = keys::derive_aes_key(rsa_shared_secret.as_ref())?;
+    drop(rsa_shared_secret);
+    let (rsa_nonce, ciphertext) = aes_encrypt(rsa_aes_encryption_key.as_ref(), &kyber_ciphertext)?;
+    drop(rsa_aes_encryption_key);
 
     Ok(format_wire_message(
         &kyber_encapsulated_secret,

@@ -10,16 +10,16 @@ use std::{
 use base64ct::{Base64, Encoding};
 use hkdf::Hkdf;
 use ml_kem::{
-    kem::{DecapsulationKey, EncapsulationKey},
     Encoded, EncodedSizeUser, KemCore, MlKem1024, MlKem1024Params,
+    kem::{DecapsulationKey, EncapsulationKey},
 };
 use rand::rngs::OsRng;
-use rand_core::RngCore;
 use rsa::{
-    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     RsaPrivateKey, RsaPublicKey,
+    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
 };
 use sha2::Sha256;
+use zeroize::Zeroizing;
 
 pub const RSA_KEY_BIT_SIZE: usize = 4096;
 
@@ -111,19 +111,21 @@ fn save_keys(
         fs::create_dir("keys")?;
     }
 
-    let kyber_dk_bytes = kyber_dk.as_bytes().to_vec();
+    let kyber_dk_bytes = Zeroizing::new(kyber_dk.as_bytes().to_vec());
     let kyber_ek_bytes = kyber_ek.as_bytes().to_vec();
 
-    let rsa_dk_bytes = rsa_dk
-        .to_pkcs8_der()
-        .map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("Failed to serialize RSA private key:\n{}", e),
-            )
-        })?
-        .as_bytes()
-        .to_vec();
+    let rsa_dk_bytes = Zeroizing::new(
+        rsa_dk
+            .to_pkcs8_der()
+            .map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Failed to serialize RSA private key:\n{}", e),
+                )
+            })?
+            .as_bytes()
+            .to_vec(),
+    );
     let rsa_ek_bytes = rsa_ek
         .to_public_key_der()
         .map_err(|e| {
@@ -154,6 +156,8 @@ fn save_keys(
         &rsa_dk_bytes,
         &file_path_for_secret_key,
     )?;
+    drop(kyber_dk_bytes);
+    drop(rsa_dk_bytes);
     write_key(
         "PUBLIC",
         &kyber_ek_bytes,
@@ -165,15 +169,16 @@ fn save_keys(
 }
 
 fn write_key(kind: &str, kyber_bytes: &[u8], rsa_bytes: &[u8], path: &str) -> io::Result<()> {
-    let mut key = Vec::new();
-    key.extend_from_slice(&kyber_bytes);
-    key.extend_from_slice(&rsa_bytes);
+    let mut key = Zeroizing::new(Vec::new());
+    key.extend_from_slice(kyber_bytes);
+    key.extend_from_slice(rsa_bytes);
 
-    let mut key_string = String::new();
+    let mut key_string = Zeroizing::new(String::new());
     let header = format!("-----BEGIN HOLOCRON {} KEY-----\n\n", kind);
     let footer = format!("\n\n-----END HOLOCRON {} KEY-----", kind);
     key_string.push_str(&header);
-    key_string.push_str(&Base64::encode_string(&key));
+    let encoded_key = Zeroizing::new(Base64::encode_string(&key));
+    key_string.push_str(&encoded_key);
     key_string.push_str(&footer);
 
     let mut file = File::create(path)?;
@@ -226,22 +231,26 @@ pub fn parse_secret_key(
     path: &str,
 ) -> Result<(DecapsulationKey<MlKem1024Params>, RsaPrivateKey), io::Error> {
     let mut file = File::open(&path)?;
-    let mut contents = String::new();
+    let mut contents = Zeroizing::new(String::new());
     file.read_to_string(&mut contents)?;
 
     // Get content between headers, more flexibly
-    let content = contents
-        .lines()
-        .filter(|line| !line.starts_with("-----") && !line.is_empty())
-        .collect::<Vec<&str>>()
-        .join("");
+    let content = Zeroizing::new(
+        contents
+            .lines()
+            .filter(|line| !line.starts_with("-----") && !line.is_empty())
+            .collect::<Vec<&str>>()
+            .join(""),
+    );
 
-    let bytes = Base64::decode_vec(&content).map_err(|_| {
+    let bytes = Zeroizing::new(Base64::decode_vec(&content).map_err(|_| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "Failed to decode base64 content",
         )
-    })?;
+    })?);
+    drop(content);
+    drop(contents);
 
     if bytes.len() < 3168 {
         return Err(std::io::Error::new(
@@ -253,16 +262,18 @@ pub fn parse_secret_key(
     let kyber_bytes = &bytes[..3168];
     let rsa_bytes = &bytes[3168..];
 
-    let kyber_array: [u8; 3168] = kyber_bytes.try_into().map_err(|_| {
+    let kyber_array = Zeroizing::new(<[u8; 3168]>::try_from(kyber_bytes).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid Kyber key length")
-    })?;
+    })?);
 
-    let decoded = Encoded::<DecapsulationKey<MlKem1024Params>>::from(kyber_array);
+    let decoded = Encoded::<DecapsulationKey<MlKem1024Params>>::from(*kyber_array);
     let kyber_dk = DecapsulationKey::<MlKem1024Params>::from_bytes(&decoded);
 
     let rsa_dk = RsaPrivateKey::from_pkcs8_der(rsa_bytes).map_err(|_| {
         std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to decode RSA key")
     })?;
+    drop(kyber_array);
+    drop(bytes);
 
     Ok((kyber_dk, rsa_dk))
 }
@@ -319,12 +330,10 @@ pub fn delete_keys_folder() -> Result<(), io::Error> {
     }
 }
 
-pub fn derive_aes_key(shared_secret: &[u8]) -> Result<Vec<u8>, KeyError> {
-    let mut salt = [0u8; 32];
-    OsRng.fill_bytes(&mut salt);
+pub fn derive_aes_key(shared_secret: &[u8]) -> Result<Zeroizing<[u8; 32]>, KeyError> {
     let hk = Hkdf::<Sha256>::new(None, shared_secret);
-    let mut okm = [0u8; 32];
-    hk.expand(b"aes256gcm key", &mut okm)
+    let mut okm = Zeroizing::new([0u8; 32]);
+    hk.expand(b"aes256gcm key", okm.as_mut())
         .map_err(|e| KeyError::DerivationFailed(e.to_string()))?;
-    Ok(okm.to_vec())
+    Ok(okm)
 }
